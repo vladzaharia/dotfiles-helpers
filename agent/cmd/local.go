@@ -10,29 +10,27 @@ import (
 
 var localCmd = &cobra.Command{
 	Use:                "local [flags]",
-	Short:              "Launch Codex CLI with local models (LM Studio/Ollama)",
+	Short:              "Launch Claude Code with local models (LM Studio)",
 	DisableFlagParsing: true,
 	SilenceUsage:       true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := loadConfig()
 
-		if missing := iexec.ValidateDeps("codex"); len(missing) > 0 {
-			output.Error("codex CLI not found — install with: brew install --cask codex")
+		if missing := iexec.ValidateDeps("claude"); len(missing) > 0 {
+			output.Error("Claude Code not found — install with: brew install --cask claude-code")
 			os.Exit(1)
 		}
 
-		// Pass LM Studio config via codex CLI flags (not deprecated env vars)
-		execArgs := []string{"--oss"}
-		if cfg.Local.Provider == "lmstudio" {
-			execArgs = append(execArgs, "--local-provider", "lmstudio")
-			execArgs = append(execArgs, "-c", "openai_base_url="+cfg.Local.URL+"/v1")
-		}
-		if cfg.Local.DefaultModel != "" {
-			execArgs = append(execArgs, "--model", cfg.Local.DefaultModel)
-		}
-		execArgs = append(execArgs, args...)
+		// Point Claude Code at local LM Studio
+		os.Setenv("ANTHROPIC_BASE_URL", cfg.Local.URL)
+		os.Setenv("ANTHROPIC_API_KEY", "lmstudio")
 
-		output.Info("Launching Codex (local) via %s at %s", cfg.Local.Provider, cfg.Local.URL)
-		return iexec.Exec("codex", execArgs)
+		execArgs := args
+		if cfg.Local.DefaultModel != "" {
+			execArgs = append([]string{"--model", cfg.Local.DefaultModel}, execArgs...)
+		}
+
+		output.Info("Launching Claude Code (local) via %s at %s", cfg.Local.Provider, cfg.Local.URL)
+		return iexec.Exec("claude", execArgs)
 	},
 }
