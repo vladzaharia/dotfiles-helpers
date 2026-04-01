@@ -1,0 +1,99 @@
+version: 2
+
+builds:
+  - id: agent-helper
+    binary: agent-helper
+    main: ./cmd/agent-helper
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/vladzaharia/dotfiles-helpers/agent/cmd.version={{.Version}}
+
+  - id: vault-helper
+    binary: vault-helper
+    main: ./cmd/vault-helper
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+  - id: sops-helper
+    binary: sops-helper
+    main: ./cmd/sops-helper
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+archives:
+  - id: agent-helper
+    builds: [agent-helper]
+    name_template: "agent-helper_{{ .Os }}_{{ .Arch }}"
+  - id: vault-helper
+    builds: [vault-helper]
+    name_template: "vault-helper_{{ .Os }}_{{ .Arch }}"
+  - id: sops-helper
+    builds: [sops-helper]
+    name_template: "sops-helper_{{ .Os }}_{{ .Arch }}"
+
+brews:
+  - name: agent-helper
+    ids: [agent-helper]
+    repository:
+      owner: vladzaharia
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/vladzaharia/dotfiles-helpers
+    description: "Unified AI coding agent dispatcher"
+    install: |
+      bin.install "agent-helper"
+      bin.install_symlink "agent-helper" => "ag"
+
+  - name: vault-helper
+    ids: [vault-helper]
+    repository:
+      owner: vladzaharia
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/vladzaharia/dotfiles-helpers
+    description: "HashiCorp Vault CLI helper (SSH certs, TOTP, env injection)"
+    install: |
+      bin.install "vault-helper"
+      %w[vh vlogin vssh vmosh votp vtoken vnv vdocker].each do |name|
+        bin.install_symlink "vault-helper" => name
+      end
+
+  - name: sops-helper
+    ids: [sops-helper]
+    repository:
+      owner: vladzaharia
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/vladzaharia/dotfiles-helpers
+    description: "SOPS encryption/decryption CLI with glob support"
+    install: |
+      bin.install "sops-helper"
+      bin.install_symlink "sops-helper" => "crypto"
+
+nfpms:
+  - id: agent-helper
+    package_name: agent-helper
+    builds: [agent-helper]
+    formats: [deb, rpm]
+    contents:
+      - src: agent-helper
+        dst: /usr/local/bin/ag
+        type: symlink
+  - id: vault-helper
+    package_name: vault-helper
+    builds: [vault-helper]
+    formats: [deb, rpm]
+  - id: sops-helper
+    package_name: sops-helper
+    builds: [sops-helper]
+    formats: [deb, rpm]
+
+release:
+  github:
+    owner: vladzaharia
+    name: dotfiles-helpers
