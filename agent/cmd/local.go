@@ -17,16 +17,16 @@ var localCmd = &cobra.Command{
 		cfg := loadConfig()
 
 		if missing := iexec.ValidateDeps("codex"); len(missing) > 0 {
-			output.Error("codex CLI not found — install with: brew install codex")
+			output.Error("codex CLI not found — install with: brew install --cask codex")
 			os.Exit(1)
 		}
 
-		if cfg.Local.Provider == "lmstudio" {
-			os.Setenv("OPENAI_BASE_URL", cfg.Local.URL+"/v1")
-			os.Setenv("OPENAI_API_KEY", "lmstudio")
-		}
-
+		// Pass LM Studio config via codex CLI flags (not deprecated env vars)
 		execArgs := []string{"--oss"}
+		if cfg.Local.Provider == "lmstudio" {
+			execArgs = append(execArgs, "--local-provider", "lmstudio")
+			execArgs = append(execArgs, "-c", "openai_base_url="+cfg.Local.URL+"/v1")
+		}
 		if cfg.Local.DefaultModel != "" {
 			execArgs = append(execArgs, "--model", cfg.Local.DefaultModel)
 		}

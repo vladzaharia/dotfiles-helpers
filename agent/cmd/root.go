@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/vladzaharia/dotfiles-helpers/internal/config"
@@ -26,42 +24,16 @@ var rootCmd = &cobra.Command{
 			return runSetup(cmd, args)
 		}
 
-		// Smart default: claude if online, local if offline
-		if hasInternet() {
-			if _, err := iexec.FindBinary("claude"); err == nil {
-				output.Info("Launching Claude Code (online)")
-				return iexec.Exec("claude", args)
-			}
+		// Default: always launch claude
+		if _, err := iexec.FindBinary("claude"); err == nil {
+			output.Info("Launching Claude Code")
+			return iexec.Exec("claude", args)
 		}
 
-		// Offline or no claude — try local
-		cfg := loadConfig()
-		if _, err := iexec.FindBinary("codex"); err == nil {
-			os.Setenv("OPENAI_BASE_URL", cfg.Local.URL+"/v1")
-			os.Setenv("OPENAI_API_KEY", "lmstudio")
-			localArgs := []string{"--oss"}
-			if cfg.Local.DefaultModel != "" {
-				localArgs = append(localArgs, "--model", cfg.Local.DefaultModel)
-			}
-			localArgs = append(localArgs, args...)
-			output.Info("Launching Codex (local) via %s", cfg.Local.Provider)
-			return iexec.Exec("codex", localArgs)
-		}
-
-		// Nothing available — show status
-		output.Warn("No agent available to launch. Install claude or codex.")
-		return runStatus(cmd, args)
+		output.Error("Claude Code not found — install with: brew install --cask claude-code")
+		os.Exit(1)
+		return nil
 	},
-}
-
-func hasInternet() bool {
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Head("https://api.anthropic.com")
-	if err != nil {
-		return false
-	}
-	resp.Body.Close()
-	return true
 }
 
 func Execute() {
