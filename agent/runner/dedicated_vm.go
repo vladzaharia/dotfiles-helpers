@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -79,18 +80,23 @@ func (r DedicatedVMRunner) Run(p provider.Provider, passthrough []string, opts O
 	created := false
 	if machine == nil {
 		output.Info("Creating dedicated VM %q for %s (bootstrap %s)…", name, filepath.Base(cwd), plan.Version)
-		if err := orb.Create(orb.CreateOptions{
-			Distro:   "ubuntu",
-			Name:     name,
-			Isolated: true,
-			Mounts:   mounts,
-			UserData: plan.Yaml,
-		}); err != nil {
+		err := provisionGuard(name,
+			func(ctx context.Context) error {
+				return orb.CreateContext(ctx, orb.CreateOptions{
+					Distro:   "ubuntu",
+					Name:     name,
+					Isolated: true,
+					Mounts:   mounts,
+					UserData: plan.Yaml,
+				})
+			},
+			func(ctx context.Context) error {
+				output.Info("Waiting for cloud-init…")
+				return orb.WaitCloudInitContext(ctx, name)
+			},
+		)
+		if err != nil {
 			return err
-		}
-		output.Info("Waiting for cloud-init…")
-		if err := orb.WaitCloudInit(name); err != nil {
-			return fmt.Errorf("provisioning %s: %w", name, err)
 		}
 		_ = orb.WriteMountSignature(name, expectedSig)
 		created = true

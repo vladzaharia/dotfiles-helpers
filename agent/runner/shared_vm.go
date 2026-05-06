@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -68,18 +69,23 @@ func (r SharedVMRunner) Run(p provider.Provider, passthrough []string, opts Opti
 
 	if machine == nil {
 		output.Info("Creating shared VM %q (bootstrap %s)…", name, plan.Version)
-		if err := orb.Create(orb.CreateOptions{
-			Distro:   "ubuntu",
-			Name:     name,
-			Isolated: true,
-			Mounts:   mounts,
-			UserData: plan.Yaml,
-		}); err != nil {
-			return err
-		}
-		output.Info("Waiting for cloud-init…")
-		if err := orb.WaitCloudInit(name); err != nil {
-			return fmt.Errorf("provisioning %s: %w", name, err)
+		err := provisionGuard(name,
+			func(ctx context.Context) error {
+				return orb.CreateContext(ctx, orb.CreateOptions{
+					Distro:   "ubuntu",
+					Name:     name,
+					Isolated: true,
+					Mounts:   mounts,
+					UserData: plan.Yaml,
+				})
+			},
+			func(ctx context.Context) error {
+				output.Info("Waiting for cloud-init…")
+				return orb.WaitCloudInitContext(ctx, name)
+			},
+		)
+		if err != nil {
+			return err // provisionGuard already cleaned up the partial VM
 		}
 		_ = orb.WriteMountSignature(name, expectedSig)
 	} else {
