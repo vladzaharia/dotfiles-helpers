@@ -1,0 +1,13 @@
+# Build artifacts
+/agent-helper
+/vault-helper
+/sops-helper
+/dist/
+
+# Per-project Claude Code state
+/.claude/
+
+# Editor
+.idea/
+.vscode/
+*.swp
