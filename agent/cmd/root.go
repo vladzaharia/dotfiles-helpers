@@ -45,5 +45,6 @@ func init() {
 	rootCmd.AddCommand(vmCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(packsCmd)
+	rootCmd.AddCommand(authCmd)
 	rootCmd.Version = version
 }
