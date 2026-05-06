@@ -27,13 +27,13 @@ builds:
 
 archives:
   - id: agent-helper
-    builds: [agent-helper]
+    ids: [agent-helper]
     name_template: "agent-helper_{{ .Os }}_{{ .Arch }}"
   - id: vault-helper
-    builds: [vault-helper]
+    ids: [vault-helper]
     name_template: "vault-helper_{{ .Os }}_{{ .Arch }}"
   - id: sops-helper
-    builds: [sops-helper]
+    ids: [sops-helper]
     name_template: "sops-helper_{{ .Os }}_{{ .Arch }}"
 
 brews:
@@ -78,7 +78,8 @@ brews:
 nfpms:
   - id: agent-helper
     package_name: agent-helper
-    builds: [agent-helper]
+    ids: [agent-helper]
+    maintainer: Vlad Zaharia <accounts@vlad.gg>
     formats: [deb, rpm]
     contents:
       - src: agent-helper
@@ -86,11 +87,13 @@ nfpms:
         type: symlink
   - id: vault-helper
     package_name: vault-helper
-    builds: [vault-helper]
+    ids: [vault-helper]
+    maintainer: Vlad Zaharia <accounts@vlad.gg>
     formats: [deb, rpm]
   - id: sops-helper
     package_name: sops-helper
-    builds: [sops-helper]
+    ids: [sops-helper]
+    maintainer: Vlad Zaharia <accounts@vlad.gg>
     formats: [deb, rpm]
 
 release:
