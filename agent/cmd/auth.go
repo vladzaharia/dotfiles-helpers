@@ -1,13 +1,19 @@
 package cmd
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
+	iexec "github.com/vladzaharia/dotfiles-helpers/internal/exec"
 	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
 
@@ -60,6 +66,50 @@ var authClaudeCmd = &cobra.Command{
 		fmt.Println()
 		return nil
 	},
+}
+
+// runClaudeSetupToken runs `claude setup-token` with stdio attached so
+// the user can complete the browser OAuth flow, captures the printed
+// token, and persists it to secrets.toml.
+func runClaudeSetupToken(r *bufio.Reader) error {
+	binPath, err := iexec.FindRealBinary("claude")
+	if err != nil {
+		return fmt.Errorf("claude not found on PATH: %w", err)
+	}
+	output.Info("Running `claude setup-token` — a browser will open. Authorize and copy the token.")
+	cmd := exec.Command(binPath, "setup-token")
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	var captured bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &captured)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("claude setup-token: %w", err)
+	}
+
+	tokenRE := regexp.MustCompile(`sk-ant-oat\S+`)
+	token := tokenRE.FindString(captured.String())
+	if token == "" {
+		fmt.Print("  Token not auto-detected. Paste it manually: ")
+		raw, _ := r.ReadString('\n')
+		token = strings.TrimSpace(raw)
+	}
+	if token == "" {
+		return fmt.Errorf("no token captured")
+	}
+
+	s, _ := LoadSecrets()
+	s.ClaudeOAuthToken = token
+	if err := SaveSecrets(s); err != nil {
+		return err
+	}
+	output.Success("Token saved to %s (mode 0600)", secretsPath())
+	output.Info("agent-helper will forward CLAUDE_CODE_OAUTH_TOKEN to every VM session.")
+	return nil
+}
+
+// runKeychainExport invokes the same logic as `auth claude export-keychain`.
+func runKeychainExport() error {
+	return authClaudeExportKeychainCmd.RunE(authClaudeExportKeychainCmd, []string{})
 }
 
 var authClaudeExportKeychainCmd = &cobra.Command{

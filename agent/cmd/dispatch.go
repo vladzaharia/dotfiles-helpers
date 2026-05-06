@@ -45,6 +45,12 @@ func dispatch(providerName string, rawArgs []string, mutate func(*args.Parsed)) 
 
 	cwdForCfg, _ := os.Getwd()
 	cfg := loadEffectiveConfig(cwdForCfg)
+
+	// Apply persisted secrets so EnvForward picks them up like any
+	// other host env var. The user's actual shell env always wins.
+	if secrets, err := LoadSecrets(); err == nil {
+		secrets.ApplyEnv()
+	}
 	defaultMode := defaultModeFromConfig(cfg.Defaults.Isolated)
 	// --local always implies host execution (LM Studio is on host loopback).
 	if parsed.Local && parsed.Isolated == args.IsolationUnset {
