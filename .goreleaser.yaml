@@ -36,44 +36,53 @@ archives:
     ids: [sops-helper]
     name_template: "sops-helper_{{ .Os }}_{{ .Arch }}"
 
-brews:
+homebrew_casks:
   - name: agent-helper
     ids: [agent-helper]
+    binaries: [agent-helper]
     repository:
       owner: vladzaharia
       name: homebrew-tap
-    directory: Formula
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "Unified AI coding agent dispatcher"
-    install: |
-      bin.install "agent-helper"
-      bin.install_symlink "agent-helper" => "ag"
+    custom_block: |
+      binary "#{staged_path}/agent-helper", target: "ag"
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/agent-helper"]
 
   - name: vault-helper
     ids: [vault-helper]
+    binaries: [vault-helper]
     repository:
       owner: vladzaharia
       name: homebrew-tap
-    directory: Formula
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "HashiCorp Vault CLI helper (SSH certs, TOTP, env injection)"
-    install: |
-      bin.install "vault-helper"
-      %w[vh vlogin vssh vmosh votp vtoken vnv vdocker].each do |name|
-        bin.install_symlink "vault-helper" => name
+    custom_block: |
+      %w[vh vlogin vssh vmosh votp vtoken vnv vdocker].each do |a|
+        binary "#{staged_path}/vault-helper", target: a
       end
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/vault-helper"]
 
   - name: sops-helper
     ids: [sops-helper]
+    binaries: [sops-helper]
     repository:
       owner: vladzaharia
       name: homebrew-tap
-    directory: Formula
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "SOPS encryption/decryption CLI with glob support"
-    install: |
-      bin.install "sops-helper"
-      bin.install_symlink "sops-helper" => "crypto"
+    custom_block: |
+      binary "#{staged_path}/sops-helper", target: "crypto"
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sops-helper"]
 
 nfpms:
   - id: agent-helper
