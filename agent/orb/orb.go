@@ -4,6 +4,7 @@
 package orb
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -113,8 +114,17 @@ func InfoFor(name string) (*Info, error) {
 	return &info, nil
 }
 
-// Create provisions a new machine.
+// Create provisions a new machine. Convenience wrapper for callers that
+// don't need cancellation; equivalent to CreateContext(context.Background, opts).
 func Create(opts CreateOptions) error {
+	return CreateContext(context.Background(), opts)
+}
+
+// CreateContext provisions a new machine, propagating context cancellation
+// to the orb subprocess. When ctx is cancelled, exec.CommandContext sends
+// SIGKILL after a short grace window so the call returns promptly and the
+// caller can run its own cleanup.
+func CreateContext(ctx context.Context, opts CreateOptions) error {
 	args := []string{"create"}
 	if opts.Arch != "" {
 		args = append(args, "-a", opts.Arch)
@@ -152,10 +162,14 @@ func Create(opts CreateOptions) error {
 	}
 	args = append(args, distro, opts.Name)
 
-	cmd := exec.Command(Bin, args...)
+	cmd := exec.CommandContext(ctx, Bin, args...)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		// Surface ctx.Err() preferentially so callers can errors.Is(err, context.Canceled).
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("orb create %s: %w", opts.Name, err)
 	}
 	return nil

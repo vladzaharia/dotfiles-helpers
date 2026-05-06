@@ -1,17 +1,30 @@
 package orb
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 )
 
 // WaitCloudInit blocks until cloud-init finishes inside the named machine.
-// It runs `cloud-init status --wait` over SSH; that command exits 0 when
-// the run is complete (success or already idle).
+// Convenience wrapper for callers without a context.
 func WaitCloudInit(machine string) error {
+	return WaitCloudInitContext(context.Background(), machine)
+}
+
+// WaitCloudInitContext blocks until cloud-init finishes inside the named
+// machine, returning ctx.Err() promptly if the context is cancelled. The
+// retry loop sleeps 2s between attempts, so worst-case cancel latency is
+// ~2s.
+func WaitCloudInitContext(ctx context.Context, machine string) error {
 	deadline := time.Now().Add(5 * time.Minute)
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		out, err := Capture(SSHOptions{
 			Machine: machine,
 			Argv:    []string{"cloud-init", "status", "--wait"},
@@ -22,7 +35,11 @@ func WaitCloudInit(machine string) error {
 		if time.Now().After(deadline) {
 			return fmt.Errorf("cloud-init wait timed out: %v: %s", err, strings.TrimSpace(out))
 		}
-		time.Sleep(2 * time.Second)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
 	}
 }
 
