@@ -45,12 +45,11 @@ homebrew_casks:
       name: homebrew-tap
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "Unified AI coding agent dispatcher"
-    custom_block: |
-      binary "#{staged_path}/agent-helper", target: "ag"
     hooks:
       post:
         install: |
           system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/agent-helper"]
+          system_command "/bin/ln", args: ["-sfn", "#{staged_path}/agent-helper", "#{HOMEBREW_PREFIX}/bin/ag"]
 
   - name: vault-helper
     ids: [vault-helper]
@@ -60,14 +59,13 @@ homebrew_casks:
       name: homebrew-tap
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "HashiCorp Vault CLI helper (SSH certs, TOTP, env injection)"
-    custom_block: |
-      %w[vh vlogin vssh vmosh votp vtoken vnv vdocker].each do |a|
-        binary "#{staged_path}/vault-helper", target: a
-      end
     hooks:
       post:
         install: |
           system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/vault-helper"]
+          %w[vh vlogin vssh vmosh votp vtoken vnv vdocker].each do |a|
+            system_command "/bin/ln", args: ["-sfn", "#{staged_path}/vault-helper", "#{HOMEBREW_PREFIX}/bin/#{a}"]
+          end
 
   - name: sops-helper
     ids: [sops-helper]
@@ -77,12 +75,11 @@ homebrew_casks:
       name: homebrew-tap
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "SOPS encryption/decryption CLI with glob support"
-    custom_block: |
-      binary "#{staged_path}/sops-helper", target: "crypto"
     hooks:
       post:
         install: |
           system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sops-helper"]
+          system_command "/bin/ln", args: ["-sfn", "#{staged_path}/sops-helper", "#{HOMEBREW_PREFIX}/bin/crypto"]
 
 nfpms:
   - id: agent-helper
