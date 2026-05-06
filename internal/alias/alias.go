@@ -11,6 +11,10 @@ import (
 func RewriteArgs(binaryName string, aliasMap map[string]string) {
 	base := filepath.Base(os.Args[0])
 	if sub, ok := aliasMap[base]; ok {
-		os.Args = append([]string{binaryName, sub}, os.Args[1:]...)
+		if sub == "" {
+			os.Args = append([]string{binaryName}, os.Args[1:]...)
+		} else {
+			os.Args = append([]string{binaryName, sub}, os.Args[1:]...)
+		}
 	}
 }

@@ -26,11 +26,17 @@ func ValidateDeps(names ...string) []string {
 }
 
 // Exec replaces the current process with the given binary (unix exec).
-// This is used for dispatch — the helper process is replaced by the target tool.
+// This is used for dispatch — the helper process is replaced by the
+// target tool. Shadow symlinks pointing back at agent-helper are
+// skipped so the dispatcher doesn't recurse into itself.
 func Exec(binary string, args []string) error {
-	path, err := exec.LookPath(binary)
+	path, err := FindRealBinary(binary)
 	if err != nil {
-		return fmt.Errorf("%s not found in PATH", binary)
+		if p, err2 := exec.LookPath(binary); err2 == nil {
+			path = p
+		} else {
+			return fmt.Errorf("%s not found in PATH", binary)
+		}
 	}
 	argv := append([]string{binary}, args...)
 	return syscall.Exec(path, argv, os.Environ())

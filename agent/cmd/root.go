@@ -6,33 +6,27 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/vladzaharia/dotfiles-helpers/internal/config"
-	iexec "github.com/vladzaharia/dotfiles-helpers/internal/exec"
-	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
 
 var version = "dev"
 
 var rootCmd = &cobra.Command{
-	Use:          "agent-helper",
-	Short:        "Unified AI coding agent dispatcher",
-	Long:         "Dispatch between Claude Code, Codex CLI, and local models (LM Studio/Ollama).",
-	SilenceUsage: true,
+	Use:                "agent-helper",
+	Short:              "Unified AI coding agent dispatcher",
+	Long:               "Dispatch between Claude Code, Codex CLI, and local models (LM Studio/Ollama). Run inside isolated OrbStack VMs by default.",
+	SilenceUsage:       true,
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !config.Exists("agent-helper") {
 			fmt.Println("No configuration found. Running setup...")
 			fmt.Println()
 			return runSetup(cmd, args)
 		}
-
-		// Default: always launch claude
-		if _, err := iexec.FindBinary("claude"); err == nil {
-			output.Info("Launching Claude Code")
-			return iexec.Exec("claude", args)
-		}
-
-		output.Error("Claude Code not found — install with: brew install --cask claude-code")
-		os.Exit(1)
-		return nil
+		// Use os.Args[1:] because cobra's `args` drops unknown flags even
+		// with FParseErrWhitelist.UnknownFlags=true.
+		cwd, _ := os.Getwd()
+		cfg := loadEffectiveConfig(cwd)
+		return dispatch(cfg.Defaults.Agent, os.Args[1:], nil)
 	},
 }
 
@@ -48,5 +42,8 @@ func init() {
 	rootCmd.AddCommand(claudeCmd)
 	rootCmd.AddCommand(codexCmd)
 	rootCmd.AddCommand(localCmd)
+	rootCmd.AddCommand(vmCmd)
+	rootCmd.AddCommand(doctorCmd)
+	rootCmd.AddCommand(packsCmd)
 	rootCmd.Version = version
 }

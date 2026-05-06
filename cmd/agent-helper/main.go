@@ -6,8 +6,13 @@ import (
 )
 
 func main() {
+	// Shadow alias dispatch: when invoked via a busybox-style symlink whose
+	// basename matches a provider name, route to that subcommand.
 	alias.RewriteArgs("agent-helper", map[string]string{
-		"ag": "",
+		"ag":     "",
+		"claude": "claude",
+		"codex":  "codex",
+		"gemini": "gemini", // future provider
 	})
 	cmd.Execute()
 }
