@@ -50,19 +50,35 @@ func (r DedicatedVMRunner) Run(p provider.Provider, passthrough []string, opts O
 		}
 	}
 
-	machine, err := orb.Find(name)
-	if err != nil {
-		return err
-	}
 	plan, err := p.Bootstrap(opts.ExtraPacks)
 	if err != nil {
 		return err
 	}
+	mounts := []orb.MountSpec{mount}
+	mounts = append(mounts, orb.StateMounts(p.StateDirs())...)
+	expectedSig := orb.MountSignature(mounts)
+
+	machine, err := orb.Find(name)
+	if err != nil {
+		return err
+	}
+
+	// Mount drift recreate (matters mostly when --keep persisted a VM
+	// whose mount set has since changed — e.g. project moved on disk).
+	if machine != nil {
+		if currentSig, _ := orb.ReadMountSignature(name); currentSig != "" && currentSig != expectedSig {
+			output.Info("Mount config changed (%s → %s); recreating %s…", currentSig, expectedSig, name)
+			if err := orb.Delete(name); err != nil {
+				return fmt.Errorf("delete %s: %w", name, err)
+			}
+			_ = state.ForgetVM(name)
+			machine = nil
+		}
+	}
+
 	created := false
 	if machine == nil {
 		output.Info("Creating dedicated VM %q for %s (bootstrap %s)…", name, filepath.Base(cwd), plan.Version)
-		mounts := []orb.MountSpec{mount}
-		mounts = append(mounts, orb.StateMounts(p.StateDirs())...)
 		if err := orb.Create(orb.CreateOptions{
 			Distro:   "ubuntu",
 			Name:     name,
@@ -76,6 +92,7 @@ func (r DedicatedVMRunner) Run(p provider.Provider, passthrough []string, opts O
 		if err := orb.WaitCloudInit(name); err != nil {
 			return fmt.Errorf("provisioning %s: %w", name, err)
 		}
+		_ = orb.WriteMountSignature(name, expectedSig)
 		created = true
 	} else {
 		if !machine.IsRunning() {

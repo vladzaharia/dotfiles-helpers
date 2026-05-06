@@ -43,8 +43,29 @@ func ReadBootstrapVersion(machine string) (string, error) {
 
 // WriteBootstrapVersion records the current bootstrap version inside the VM.
 func WriteBootstrapVersion(machine, version string) error {
-	cmd := fmt.Sprintf("sudo install -d -m 0755 /etc/agent-helper && echo %s | sudo tee /etc/agent-helper/bootstrap.version >/dev/null",
-		shellQuote(version))
+	return writeMarker(machine, "/etc/agent-helper/bootstrap.version", version)
+}
+
+// ReadMountSignature returns the previously-stored mount signature, or "".
+func ReadMountSignature(machine string) (string, error) {
+	out, err := Capture(SSHOptions{
+		Machine: machine,
+		Argv:    []string{"cat", "/etc/agent-helper/mount.signature"},
+	})
+	if err != nil {
+		return "", nil // missing → empty (not an error)
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// WriteMountSignature stamps the resolved mount set's signature inside the VM.
+func WriteMountSignature(machine, sig string) error {
+	return writeMarker(machine, "/etc/agent-helper/mount.signature", sig)
+}
+
+func writeMarker(machine, path, content string) error {
+	cmd := fmt.Sprintf("sudo install -d -m 0755 /etc/agent-helper && echo %s | sudo tee %s >/dev/null",
+		shellQuote(content), shellQuote(path))
 	_, err := Capture(SSHOptions{
 		Machine: machine,
 		Argv:    []string{"bash", "-lc", cmd},

@@ -1,9 +1,12 @@
 package orb
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -129,6 +132,20 @@ func currentUsername() string {
 		return u
 	}
 	return ""
+}
+
+// MountSignature returns a short content-hash of the resolved mount set.
+// Two mount sets with identical (source,dest) pairs hash identically
+// regardless of order. Used to detect mount-config drift on existing
+// VMs (which require recreate — `orb create --mount` is create-time only).
+func MountSignature(mounts []MountSpec) string {
+	parts := make([]string, len(mounts))
+	for i, m := range mounts {
+		parts[i] = m.Source + "→" + m.Dest
+	}
+	sort.Strings(parts)
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\n")))
+	return hex.EncodeToString(sum[:])[:12]
 }
 
 // DedicatedMount returns the single mount spec for a per-project VM.
