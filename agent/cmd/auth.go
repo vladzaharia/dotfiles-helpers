@@ -100,6 +100,24 @@ Caveats:
 	},
 }
 
+// printClaudeAuthSummary emits a one-line summary of Claude credential
+// readiness for VM use, suitable for embedding in `doctor` output.
+func printClaudeAuthSummary() {
+	if os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != "" {
+		fmt.Println(output.StatusOK("Claude", "CLAUDE_CODE_OAUTH_TOKEN set (forwarded to VM)"))
+		return
+	}
+	if st, err := os.Stat(credentialsPath()); err == nil && !st.IsDir() {
+		fmt.Println(output.StatusOK("Claude", "credentials.json present (mounted into VM)"))
+		return
+	}
+	if runtime.GOOS == "darwin" && hasKeychainEntry() {
+		fmt.Println(output.StatusFail("Claude", "Keychain only — VM not authenticated. Run: agent-helper auth claude export-keychain"))
+		return
+	}
+	fmt.Println(output.StatusFail("Claude", "no credentials. Run: claude /login or agent-helper auth claude"))
+}
+
 func credentialsPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".claude", ".credentials.json")

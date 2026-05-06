@@ -47,6 +47,11 @@ var doctorCmd = &cobra.Command{
 		}
 
 		fmt.Println()
+		fmt.Println("  Auth (VM-ready)")
+		fmt.Println("  ───────────────")
+		printClaudeAuthSummary()
+
+		fmt.Println()
 		fmt.Println("  Sessions (live)")
 		fmt.Println("  ───────────────")
 		state.PruneStale()
