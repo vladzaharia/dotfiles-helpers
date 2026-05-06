@@ -1,0 +1,5 @@
+name = "dev-all"
+category = "meta"
+description = "Everything: web + systems + JVM + .NET"
+deps = ["dev-web", "dev-systems", "dev-jvm", "dotnet"]
+runcmd = []

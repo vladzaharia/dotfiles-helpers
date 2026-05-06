@@ -1,0 +1,35 @@
+name = "base"
+category = "core"
+description = "Core OS bootstrap: build toolchain, VCS, archive utilities"
+deps = []
+
+packages = [
+  "sudo",
+  "ca-certificates",
+  "curl",
+  "wget",
+  "gnupg",
+  "openssh-client",
+  "rsync",
+  "locales",
+  "build-essential",
+  "pkg-config",
+  "autoconf",
+  "automake",
+  "cmake",
+  "git",
+  "git-lfs",
+  "unzip",
+  "zip",
+  "xz-utils",
+  "tar",
+  "jq",
+  "less",
+  "vim",
+  "nano",
+  "file",
+  "tree",
+  "man-db",
+]
+
+runcmd = []

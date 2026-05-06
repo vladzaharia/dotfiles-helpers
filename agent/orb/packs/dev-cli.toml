@@ -1,0 +1,19 @@
+name = "dev-cli"
+category = "tools"
+description = "Modern CLI quality-of-life: ripgrep, fd, fzf, htop, tmux, bat"
+deps = ["base"]
+
+packages = [
+  "ripgrep",
+  "fd-find",
+  "fzf",
+  "htop",
+  "tmux",
+  "bat",
+  "eza",
+]
+
+runcmd = [
+  "ln -sf /usr/bin/fdfind /usr/local/bin/fd",
+  "ln -sf /usr/bin/batcat /usr/local/bin/bat",
+]

@@ -1,0 +1,5 @@
+name = "dev-jvm"
+category = "meta"
+description = "JVM stack: Java"
+deps = ["java"]
+runcmd = []

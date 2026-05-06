@@ -1,0 +1,14 @@
+name = "rust"
+category = "language"
+description = "Rust toolchain via rustup (stable)"
+deps = ["base"]
+
+runcmd = [
+  "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | env RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo sh -s -- -y --default-toolchain stable --no-modify-path",
+  "ln -sf /usr/local/cargo/bin/* /usr/local/bin/",
+]
+
+[[write_files]]
+path = "/etc/profile.d/rust.sh"
+content = "export RUSTUP_HOME=/usr/local/rustup\nexport CARGO_HOME=/usr/local/cargo\nexport PATH=\"$CARGO_HOME/bin:$PATH\"\n"
+permissions = "0644"

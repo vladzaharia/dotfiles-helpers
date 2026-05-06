@@ -1,0 +1,8 @@
+name = "dotnet"
+category = "language"
+description = ".NET SDK via Microsoft apt repo"
+deps = ["base"]
+
+runcmd = [
+  "DEBIAN_FRONTEND=noninteractive apt-get install -y dotnet-sdk-9.0 || (curl -fsSL https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -o /tmp/ms.deb && dpkg -i /tmp/ms.deb && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y dotnet-sdk-9.0)",
+]

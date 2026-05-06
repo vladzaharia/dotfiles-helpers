@@ -1,0 +1,10 @@
+name = "java"
+category = "language"
+description = "OpenJDK 21 (Eclipse Temurin)"
+deps = ["base"]
+
+packages = [
+  "openjdk-21-jdk-headless",
+  "maven",
+]
+runcmd = []

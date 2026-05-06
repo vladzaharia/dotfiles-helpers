@@ -1,0 +1,12 @@
+name = "nodejs"
+category = "language"
+description = "Node.js 22 LTS via NodeSource + corepack (pnpm, yarn)"
+deps = ["base"]
+
+runcmd = [
+  "curl -fsSL https://deb.nodesource.com/setup_22.x | bash -",
+  "DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs",
+  "corepack enable",
+  "corepack prepare pnpm@latest --activate",
+  "corepack prepare yarn@stable --activate",
+]

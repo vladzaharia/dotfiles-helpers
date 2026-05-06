@@ -1,0 +1,5 @@
+name = "dev-systems"
+category = "meta"
+description = "Systems stack: Rust + Go"
+deps = ["rust", "go"]
+runcmd = []

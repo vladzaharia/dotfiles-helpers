@@ -1,0 +1,8 @@
+name = "mise"
+category = "tools"
+description = "mise polyglot version manager"
+deps = ["base"]
+
+runcmd = [
+  "curl -fsSL https://mise.run | env MISE_INSTALL_PATH=/usr/local/bin/mise sh",
+]

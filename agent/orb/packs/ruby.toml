@@ -1,0 +1,10 @@
+name = "ruby"
+category = "language"
+description = "Ruby + bundler (Ubuntu apt)"
+deps = ["base"]
+
+packages = [
+  "ruby-full",
+  "ruby-dev",
+]
+runcmd = []

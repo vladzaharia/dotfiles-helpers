@@ -1,0 +1,20 @@
+name = "python"
+category = "language"
+description = "Python 3 + pip + venv + pipx + uv (Astral)"
+deps = ["base"]
+
+packages = [
+  "python3",
+  "python3-pip",
+  "python3-venv",
+  "pipx",
+]
+
+runcmd = [
+  "curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh",
+]
+
+[[write_files]]
+path = "/etc/profile.d/pipx.sh"
+content = "export PIPX_HOME=/opt/pipx\nexport PIPX_BIN_DIR=/usr/local/bin\n"
+permissions = "0644"

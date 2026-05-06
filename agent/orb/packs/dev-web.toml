@@ -1,0 +1,5 @@
+name = "dev-web"
+category = "meta"
+description = "Web stack: Node.js + Python"
+deps = ["nodejs", "python"]
+runcmd = []

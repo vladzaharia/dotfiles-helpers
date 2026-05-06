@@ -1,0 +1,8 @@
+name = "claude"
+category = "agent"
+description = "Anthropic Claude Code CLI"
+deps = ["nodejs"]
+
+runcmd = [
+  "npm install -g @anthropic-ai/claude-code",
+]

@@ -1,0 +1,8 @@
+name = "codex"
+category = "agent"
+description = "OpenAI Codex CLI"
+deps = ["nodejs"]
+
+runcmd = [
+  "npm install -g @openai/codex",
+]

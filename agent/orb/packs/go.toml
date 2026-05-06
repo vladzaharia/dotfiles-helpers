@@ -1,0 +1,8 @@
+name = "go"
+category = "language"
+description = "Go via apt (Ubuntu's golang package)"
+deps = ["base"]
+
+packages = ["golang"]
+
+runcmd = []
