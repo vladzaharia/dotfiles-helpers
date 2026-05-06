@@ -14,9 +14,10 @@ type Config struct {
 }
 
 // DefaultsConfig captures default behavior when flags are unset.
+// Per-project values can override these in `.agent-helper.toml`.
 type DefaultsConfig struct {
 	Agent    string `toml:"agent"`    // "claude" | "codex"
-	Isolated string `toml:"isolated"` // "none" | "default" | "full"
+	Isolated string `toml:"isolated"` // "none" | "shared" | "full"
 }
 
 // LocalConfig describes the host-side LM Studio binding for `--local`.
