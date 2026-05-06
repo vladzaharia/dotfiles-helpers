@@ -17,7 +17,8 @@ type Provider interface {
 	Binary() string                                  // PATH name to exec
 	InstallHint() string                             // human install instructions on missing dep
 	DefaultArgs() []string                           // baseline args prepended to user args
-	StateDirs() []string                             // host paths to seed into VMs
+	StateDirs() []string                             // host paths to live-mount into VMs
+	EnvForward() []string                            // env var names to forward into VM SSH session
 	SupportsLocal() bool                             // can be combined with --local
 	DetectHost() Status                              // host-side detection result
 	Bootstrap(extraPacks []string) (orb.BootstrapPlan, error) // cloud-init plan

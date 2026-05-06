@@ -57,6 +57,43 @@ func TestDedicatedMount(t *testing.T) {
 	}
 }
 
+func TestStateMountsSkipsMissingPaths(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("USER", "vlad")
+	// One that exists, one that doesn't.
+	if err := os.MkdirAll(filepath.Join(tmp, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	specs := StateMounts([]string{"~/.claude", "~/.does-not-exist", "/abs/path"})
+	if len(specs) != 1 {
+		t.Fatalf("expected 1 spec, got %d (%v)", len(specs), specs)
+	}
+	if specs[0].Source != filepath.Join(tmp, ".claude") {
+		t.Errorf("source = %q, want %q", specs[0].Source, filepath.Join(tmp, ".claude"))
+	}
+	if specs[0].Dest != "/home/vlad/.claude" {
+		t.Errorf("dest = %q, want /home/vlad/.claude", specs[0].Dest)
+	}
+}
+
+func TestStateMountsTranslatesFilesAndDirs(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("USER", "vlad")
+	// Both a directory and a single file should pass through.
+	if err := os.MkdirAll(filepath.Join(tmp, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, ".claude.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	specs := StateMounts([]string{"~/.claude", "~/.claude.json"})
+	if len(specs) != 2 {
+		t.Fatalf("expected 2 specs, got %d", len(specs))
+	}
+}
+
 func TestMountSpecString(t *testing.T) {
 	cases := []struct {
 		spec MountSpec

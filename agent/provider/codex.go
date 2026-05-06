@@ -15,6 +15,9 @@ func (CodexProvider) DefaultArgs() []string { return nil }
 func (CodexProvider) StateDirs() []string {
 	return []string{"~/.codex"}
 }
+func (CodexProvider) EnvForward() []string {
+	return []string{"OPENAI_API_KEY"}
+}
 func (CodexProvider) SupportsLocal() bool { return false }
 func (CodexProvider) DetectHost() Status  { return DetectCodex() }
 

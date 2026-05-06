@@ -49,11 +49,13 @@ func (r SharedVMRunner) Run(p provider.Provider, passthrough []string, opts Opti
 	}
 	if machine == nil {
 		output.Info("Creating shared VM %q (bootstrap %s)…", name, plan.Version)
+		mounts := append([]orb.MountSpec{}, r.MountRoots...)
+		mounts = append(mounts, orb.StateMounts(p.StateDirs())...)
 		if err := orb.Create(orb.CreateOptions{
 			Distro:   "ubuntu",
 			Name:     name,
 			Isolated: true,
-			Mounts:   r.MountRoots,
+			Mounts:   mounts,
 			UserData: plan.Yaml,
 		}); err != nil {
 			return err
@@ -91,5 +93,6 @@ func (r SharedVMRunner) Run(p provider.Provider, passthrough []string, opts Opti
 		Interactive: true,
 		Workdir:     vmCwd,
 		Argv:        finalArgs,
+		Env:         collectForwardedEnv(p.EnvForward()),
 	})
 }

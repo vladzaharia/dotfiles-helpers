@@ -15,6 +15,18 @@ func (ClaudeProvider) DefaultArgs() []string { return nil }
 func (ClaudeProvider) StateDirs() []string {
 	return []string{"~/.claude", "~/.claude.json"}
 }
+func (ClaudeProvider) EnvForward() []string {
+	// CLAUDE_CODE_OAUTH_TOKEN is the long-lived token from `claude setup-token`,
+	// which is the officially-supported headless auth path that bypasses the
+	// macOS Keychain entirely. ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL cover the
+	// API-key path (used by --local for LM Studio).
+	return []string{
+		"CLAUDE_CODE_OAUTH_TOKEN",
+		"ANTHROPIC_API_KEY",
+		"ANTHROPIC_BASE_URL",
+		"ANTHROPIC_AUTH_TOKEN",
+	}
+}
 func (ClaudeProvider) SupportsLocal() bool { return true }
 func (ClaudeProvider) DetectHost() Status  { return DetectClaude() }
 

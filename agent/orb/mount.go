@@ -79,6 +79,58 @@ func ResolveCWD(cwd string, specs []MountSpec) (vmPath string, ok bool) {
 	return "", false
 }
 
+// StateMounts translates a Provider's StateDirs (e.g. ["~/.claude",
+// "~/.claude.json"]) into MountSpecs that share the host paths into the
+// VM at the equivalent /home/<user>/<rel> paths. Sources that do not
+// exist on the host are silently skipped — fresh installs work without
+// failing.
+//
+// OrbStack creates the VM's default user with the same name as the
+// macOS user, so the path under ~ is identical between host and VM;
+// only the $HOME prefix differs (/Users/<u> → /home/<u>).
+func StateMounts(stateDirs []string) []MountSpec {
+	hostHome, _ := os.UserHomeDir()
+	username := currentUsername()
+	if hostHome == "" || username == "" {
+		return nil
+	}
+	vmHome := "/home/" + username
+	specs := make([]MountSpec, 0, len(stateDirs))
+	seen := map[string]struct{}{}
+	for _, p := range stateDirs {
+		if !strings.HasPrefix(p, "~/") {
+			continue
+		}
+		rel := strings.TrimPrefix(p, "~/")
+		if rel == "" {
+			continue
+		}
+		src := filepath.Join(hostHome, rel)
+		if _, err := os.Stat(src); err != nil {
+			continue
+		}
+		if _, dup := seen[src]; dup {
+			continue
+		}
+		seen[src] = struct{}{}
+		specs = append(specs, MountSpec{
+			Source: src,
+			Dest:   filepath.Join(vmHome, rel),
+		})
+	}
+	return specs
+}
+
+func currentUsername() string {
+	if u := os.Getenv("USER"); u != "" {
+		return u
+	}
+	if u := os.Getenv("LOGNAME"); u != "" {
+		return u
+	}
+	return ""
+}
+
 // DedicatedMount returns the single mount spec for a per-project VM.
 // Convention: $cwd → /work/<basename>.
 func DedicatedMount(cwd string) (MountSpec, string, error) {

@@ -61,11 +61,13 @@ func (r DedicatedVMRunner) Run(p provider.Provider, passthrough []string, opts O
 	created := false
 	if machine == nil {
 		output.Info("Creating dedicated VM %q for %s (bootstrap %s)…", name, filepath.Base(cwd), plan.Version)
+		mounts := []orb.MountSpec{mount}
+		mounts = append(mounts, orb.StateMounts(p.StateDirs())...)
 		if err := orb.Create(orb.CreateOptions{
 			Distro:   "ubuntu",
 			Name:     name,
 			Isolated: true,
-			Mounts:   []orb.MountSpec{mount},
+			Mounts:   mounts,
 			UserData: plan.Yaml,
 		}); err != nil {
 			return err
@@ -123,5 +125,6 @@ func (r DedicatedVMRunner) Run(p provider.Provider, passthrough []string, opts O
 		Interactive: true,
 		Workdir:     vmCwd,
 		Argv:        finalArgs,
+		Env:         collectForwardedEnv(p.EnvForward()),
 	})
 }
