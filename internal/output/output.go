@@ -103,11 +103,22 @@ func StatusNone(label, detail string) string {
 	return fmt.Sprintf("  %s %s  %s", statusNone, Style.Bold.Render(label), detail)
 }
 
-// InfoBox renders explanatory prose with a rounded border + dim
-// foreground. Used by both huh forms (via custom theme Description) and
-// custom Bubble Tea pages.
+// InfoBox renders explanatory prose with a rounded border + muted
+// foreground at a sensible default width (60 cols of inner content).
+// Used by both huh forms (via custom theme Description) and custom
+// Bubble Tea pages.
 func InfoBox(s string) string {
-	return Style.InfoBox.Render(s)
+	return InfoBoxW(60, s)
+}
+
+// InfoBoxW is InfoBox with an explicit max content width, so long prose
+// wraps instead of bleeding past the right edge of the terminal. width
+// is the inside-the-border content width.
+func InfoBoxW(width int, s string) string {
+	if width <= 0 {
+		return Style.InfoBox.Render(s)
+	}
+	return Style.InfoBox.Width(width).Render(s)
 }
 
 // SectionHeader returns "── Title ──" styled bold; used to delimit

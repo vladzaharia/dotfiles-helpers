@@ -27,6 +27,20 @@ func (m *pageModel) Init() tea.Cmd {
 func (m *pageModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if ws, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width, m.height = ws.Width, ws.Height
+		// huh.Form has its own width/height fields that drive internal
+		// wrapping; without these calls a long Note Description renders
+		// on one giant line and bleeds past the right edge.
+		if f, ok := m.child.(*huh.Form); ok {
+			innerW := ws.Width - 4
+			if innerW < 20 {
+				innerW = 20
+			}
+			innerH := ws.Height - 2
+			if innerH < 8 {
+				innerH = 8
+			}
+			f.WithWidth(innerW).WithHeight(innerH)
+		}
 	}
 
 	var cmd tea.Cmd

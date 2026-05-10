@@ -12,19 +12,19 @@ import (
 	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
 
-// robotLogo is the welcome ASCII art: a 7-row robot beside a 5-row
-// stylized "ag" wordmark. The wordmark sits on robot rows 1–5 so the
-// letterforms align with the robot's head/body and the robot's feet
-// (rows 6–7) extend below — the pageModel frame centers the whole
-// composition on screen, so this string only needs to look right
-// internally; absolute column padding doesn't matter.
-const robotLogo = `   T___       __ _    __ _
-  |O O|      / _' |  / _' |
-  \_^_/     | (_| | | (_| |
- /|(\)|\     \__,_|  \__, |
-d |___| b               |_|
-  .'._.'.
-  |_| |_|`
+// robotLogo is the welcome ASCII art: a 6-row robot beside the
+// "ag" wordmark (figlet "standard" font, 5 rows; backticks swapped for
+// single quotes since Go raw strings can't contain backticks). The
+// wordmark's descender (`|___/`) lands on robot row 5 so the visual
+// baseline aligns; robot feet (`|_|`) extend one row below the
+// wordmark. The pageModel frame centers the whole block, so absolute
+// column padding here only matters relative to the two halves.
+const robotLogo = `   ___       __ _  __ _
+  [o.o]     / _' |/ _' |
+  /|=|\    | (_| | (_| |
+ d |_| b    \__,_|\__, |
+   | |             |___/
+   |_|`
 
 // runWelcomePage shows the welcome screen and returns false if the
 // user picks "Cancel".
