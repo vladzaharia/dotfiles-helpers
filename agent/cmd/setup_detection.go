@@ -27,6 +27,8 @@ const (
 	rowNotReachable // LM Studio specific
 	rowInstalling
 	rowInstallFailed
+	rowLoggingIn
+	rowLoginFailed
 )
 
 type toolID string
@@ -64,6 +66,10 @@ type detectionMsg struct {
 	row  toolRow
 }
 type installDoneMsg struct {
+	tool toolID
+	err  error
+}
+type loginDoneMsg struct {
 	tool toolID
 	err  error
 }
@@ -141,6 +147,8 @@ func (m *detectionCardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case installDoneMsg:
 		m.applyInstallResult(msg)
 		return m, nil
+	case loginDoneMsg:
+		return m, m.applyLoginResult(msg)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
@@ -175,10 +183,12 @@ func (m *detectionCardModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// For LM Studio, "enter" re-probes.
 			row.state = rowLoading
 			return m, detectCmd(row.id, m.lmURL)
-		case rowActive, rowNotLoggedIn:
-			// Enter advances; no per-row login flow in this compact
-			// implementation (login happens at agent invocation).
-			return m, tea.Quit
+		case rowNotLoggedIn, rowLoginFailed:
+			row.state = rowLoggingIn
+			return m, loginCmd(row.id, m.lmURL)
+		case rowActive:
+			// Already active; enter on a healthy row is a no-op.
+			return m, nil
 		}
 	}
 	return m, nil
@@ -212,6 +222,27 @@ func (m *detectionCardModel) applyInstallResult(msg installDoneMsg) {
 	}
 }
 
+// applyLoginResult mutates the row in response to a finished login
+// subprocess and returns the follow-up command (re-detection on
+// success; nothing on failure since the row is already in the failed
+// state, the spinner stops naturally).
+func (m *detectionCardModel) applyLoginResult(msg loginDoneMsg) tea.Cmd {
+	for i := range m.rows {
+		if m.rows[i].id != msg.tool {
+			continue
+		}
+		if msg.err != nil {
+			m.rows[i].state = rowLoginFailed
+			m.rows[i].errMsg = msg.err.Error()
+			return nil
+		}
+		// Login succeeded — re-detect to update version + loggedIn state.
+		m.rows[i].state = rowLoading
+		return detectCmd(msg.tool, m.lmURL)
+	}
+	return nil
+}
+
 func (m *detectionCardModel) anyLoading() bool {
 	for _, r := range m.rows {
 		if r.state == rowLoading {
@@ -223,7 +254,7 @@ func (m *detectionCardModel) anyLoading() bool {
 
 func (m *detectionCardModel) anyInstalling() bool {
 	for _, r := range m.rows {
-		if r.state == rowInstalling {
+		if r.state == rowInstalling || r.state == rowLoggingIn {
 			return true
 		}
 	}
@@ -276,7 +307,7 @@ func (m *detectionCardModel) renderStatus(r toolRow) string {
 		}
 		return output.Style.Success.Render("✓ Active") + ver + auth
 	case rowNotLoggedIn:
-		return output.Style.Warning.Render("⚠ Installed, not logged in")
+		return output.Style.Warning.Render("⚠ Installed, not logged in") + output.Style.Dim.Render("  [enter to log in]")
 	case rowNotInstalled:
 		return output.Style.Error.Render("✗ Not installed") + output.Style.Dim.Render("  [enter to install]")
 	case rowNotReachable:
@@ -285,6 +316,10 @@ func (m *detectionCardModel) renderStatus(r toolRow) string {
 		return output.Style.Loading.Render(spinnerFrames[m.tick%len(spinnerFrames)] + " Installing…")
 	case rowInstallFailed:
 		return output.Style.Error.Render("✗ Install failed") + output.Style.Dim.Render("  [enter to retry]")
+	case rowLoggingIn:
+		return output.Style.Loading.Render(spinnerFrames[m.tick%len(spinnerFrames)] + " Waiting for browser auth…")
+	case rowLoginFailed:
+		return output.Style.Error.Render("✗ Login failed") + output.Style.Dim.Render("  [enter to retry]")
 	}
 	return ""
 }
@@ -303,12 +338,26 @@ func (m *detectionCardModel) result() *DetectionResult {
 // needsInfobox returns true when the focused row's state warrants a
 // detail blurb below the table.
 func needsInfobox(r toolRow) bool {
-	return r.state == rowNotInstalled || r.state == rowNotReachable || r.state == rowInstallFailed
+	switch r.state {
+	case rowNotInstalled, rowNotReachable, rowInstallFailed,
+		rowNotLoggedIn, rowLoginFailed:
+		return true
+	}
+	return false
 }
 
-// infoboxFor returns the per-tool infobox copy. Per-tool blurbs match
-// the wizard plan's specifications.
+// infoboxFor returns the per-tool infobox copy. Login-state focus
+// gets a login-specific blurb so the user knows what `[enter to log
+// in]` actually does.
 func infoboxFor(r toolRow) string {
+	if r.state == rowNotLoggedIn || r.state == rowLoginFailed {
+		switch r.id {
+		case toolClaude:
+			return "Claude Code is installed but not logged in.\nPress enter to run `claude setup-token` — a browser will open for OAuth, and the long-lived token gets saved for VM use."
+		case toolCodex:
+			return "Codex CLI is installed but not logged in.\nPress enter to run `codex login` and complete the auth flow."
+		}
+	}
 	switch r.id {
 	case toolClaude:
 		return "Claude Code\nAnthropic's official coding agent CLI. Required if you want to use `ag claude`."
@@ -334,10 +383,14 @@ func detectCmd(id toolID, lmURL string) tea.Cmd {
 				row.state = rowNotInstalled
 				return detectionMsg{tool: id, row: row}
 			}
-			row.state = rowActive
 			row.version = st.Version
 			row.detail = st.Detail
 			row.loggedIn = !needsClaudeAuthSetup()
+			if row.loggedIn {
+				row.state = rowActive
+			} else {
+				row.state = rowNotLoggedIn
+			}
 		case toolCodex:
 			st := provider.DetectCodex()
 			if !st.Installed {
@@ -367,6 +420,56 @@ func detectCmd(id toolID, lmURL string) tea.Cmd {
 		}
 		return detectionMsg{tool: id, row: row}
 	}
+}
+
+// loginCmd hands the terminal to the tool's login subprocess via
+// tea.ExecProcess so the user can complete the OAuth flow inline. On
+// return we re-run detection for that row.
+func loginCmd(id toolID, lmURL string) tea.Cmd {
+	subCmd := loginSubprocess(id)
+	if subCmd == nil {
+		// No login pathway implemented for this tool; surface as a
+		// soft failure so the user can pick another action.
+		return func() tea.Msg {
+			return loginDoneMsg{tool: id, err: fmt.Errorf("no inline login flow for %s yet", id)}
+		}
+	}
+	return tea.ExecProcess(subCmd, func(err error) tea.Msg {
+		// For Claude's setup-token flow we also need to capture the
+		// printed token; the existing runClaudeSetupTokenInteractive
+		// handles that, but we ran the raw subprocess here for stdio
+		// hand-off. Detection picks up the new state.
+		return loginDoneMsg{tool: id, err: err}
+	})
+}
+
+// loginSubprocess returns the *exec.Cmd that, when run with stdio
+// inherited, performs an interactive login for the named tool. Returns
+// nil when no inline login pathway exists.
+func loginSubprocess(id toolID) *exec.Cmd {
+	switch id {
+	case toolClaude:
+		path, err := exec.LookPath("claude")
+		if err != nil {
+			return nil
+		}
+		c := exec.Command(path, "setup-token")
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		return c
+	case toolCodex:
+		path, err := exec.LookPath("codex")
+		if err != nil {
+			return nil
+		}
+		c := exec.Command(path, "login")
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		return c
+	}
+	return nil
 }
 
 // installCmd kicks off an install for the focused tool. Drops out of

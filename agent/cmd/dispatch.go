@@ -139,6 +139,50 @@ func dispatch(providerName string, rawArgs []string, mutate func(*args.Parsed)) 
 	// Self-heal stale session markers before opening a new one.
 	state.PruneStale()
 
+	// Pack-vs-shared-VM mismatch check. Fires only when this dispatch
+	// resolved to ModeShared. We compare requested packs against the
+	// shared VM's recorded pack list; if anything is missing, prompt
+	// the user (or in non-interactive contexts, fall back to ModeDedicated
+	// silently with a warn).
+	if mode == runner.ModeShared {
+		requested := mergeUnique(cfg.Orb.DefaultPacks, resolveProjectPacks(nil, cwdForCfg))
+		missing := MissingPacks(providerName, requested)
+		if len(missing) > 0 {
+			if !interactiveStdio() {
+				output.Warn("shared VM missing packs %v; falling back to dedicated VM for this run", missing)
+				mode = runner.ModeDedicated
+			} else {
+				action, perr := PromptSharedMismatch(providerName, missing, cwdForCfg)
+				if perr != nil {
+					return perr
+				}
+				switch action {
+				case MismatchAddToShared:
+					// Delete the shared VM so the next provision step
+					// recreates it with the union of existing + new
+					// packs. The runner picks up the merged set via
+					// opts.ExtraPacks computed below.
+					output.Info("Re-provisioning shared VM with new packs (%v)", missing)
+					if err := orb.Delete(providerName); err != nil {
+						output.Warn("delete shared VM: %v", err)
+					}
+					_ = state.ForgetVM(providerName)
+				case MismatchUseFull:
+					mode = runner.ModeDedicated
+				case MismatchSaveFull:
+					mode = runner.ModeDedicated
+					if cwdForCfg != "" {
+						if err := saveProjectConfig(cwdForCfg, "full", cfg.Orb.DefaultPacks); err != nil {
+							output.Warn("save .agent-helper.toml: %v", err)
+						}
+					}
+				case MismatchCancel:
+					return fmt.Errorf("dispatch cancelled (shared VM missing packs %v)", missing)
+				}
+			}
+		}
+	}
+
 	r, err := runner.Pick(mode, runner.PickConfig{
 		MountRoots: orb.SharedRoots(cfg.Orb.MountRoots),
 	})

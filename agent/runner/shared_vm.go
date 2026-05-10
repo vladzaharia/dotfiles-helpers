@@ -88,6 +88,10 @@ func (r SharedVMRunner) Run(p provider.Provider, passthrough []string, opts Opti
 			return err // provisionGuard already cleaned up the partial VM
 		}
 		_ = orb.WriteMountSignature(name, expectedSig)
+		// Track which packs were provisioned so future dispatches can
+		// detect mismatch when a new project requests a pack the VM
+		// doesn't have.
+		_ = state.RecordVMPacks(name, opts.ExtraPacks)
 	} else {
 		if !machine.IsRunning() {
 			output.Info("Starting %s…", name)

@@ -49,6 +49,11 @@ type VM struct {
 	BootstrapVersion string    `json:"bootstrap_version"`
 	LastActive       time.Time `json:"last_active"`
 	OwnerPIDs        []int     `json:"owner_pids"`
+	// Packs is the list of cloud-init packs that were provisioned at
+	// VM-create time. Used by dispatch to detect when a project needs
+	// packs the shared VM doesn't have. Empty for VMs created before
+	// pack tracking was added.
+	Packs []string `json:"packs,omitempty"`
 }
 
 // OpenSession writes a sessions/<pid>.json marker.
@@ -197,6 +202,21 @@ func ReleaseVM(name string) error {
 	pid := os.Getpid()
 	v.OwnerPIDs = filterPIDs(uniqueAlive(v.OwnerPIDs), pid)
 	v.LastActive = time.Now()
+	return RecordVM(*v)
+}
+
+// RecordVMPacks updates just the Packs field on a VM record. Called
+// from the shared-VM runner after a fresh provision so dispatch can
+// later compare requested packs against what's actually installed.
+func RecordVMPacks(name string, packs []string) error {
+	v, err := LoadVM(name)
+	if err != nil {
+		return err
+	}
+	if v == nil {
+		v = &VM{Name: name}
+	}
+	v.Packs = append([]string(nil), packs...)
 	return RecordVM(*v)
 }
 
