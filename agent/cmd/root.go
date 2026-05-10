@@ -47,5 +47,7 @@ func init() {
 	rootCmd.AddCommand(packsCmd)
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.PersistentFlags().BoolVar(&refreshClaudeCreds, "refresh-creds", false,
+		"Re-extract Claude credentials from macOS Keychain (ignore cached ~/.claude/.credentials.json)")
 	rootCmd.Version = version
 }

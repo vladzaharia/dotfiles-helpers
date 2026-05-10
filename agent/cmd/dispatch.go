@@ -51,6 +51,16 @@ func dispatch(providerName string, rawArgs []string, mutate func(*args.Parsed)) 
 	if secrets, err := LoadSecrets(); err == nil {
 		secrets.ApplyEnv()
 	}
+
+	// Auto-extract Claude credentials from macOS Keychain when missing
+	// or stale, so VMs can authenticate without a manual `auth claude
+	// export-keychain` step. Soft-fail: real auth errors surface inside
+	// the agent if this didn't help.
+	if providerName == "claude" {
+		if err := EnsureClaudeCredentials(); err != nil {
+			output.Warn("Claude credential refresh: %v", err)
+		}
+	}
 	defaultMode := defaultModeFromConfig(cfg.Defaults.Isolated)
 	// --local always implies host execution (LM Studio is on host loopback).
 	if parsed.Local && parsed.Isolated == args.IsolationUnset {
