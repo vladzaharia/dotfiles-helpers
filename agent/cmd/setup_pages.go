@@ -8,28 +8,54 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/vladzaharia/dotfiles-helpers/internal/config"
 	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
 
-// robotLogo is the welcome ASCII art: a 6-row robot beside the
-// "ag" wordmark (figlet "standard" font, 5 rows; backticks swapped for
-// single quotes since Go raw strings can't contain backticks). The
-// wordmark's descender (`|___/`) lands on robot row 5 so the visual
-// baseline aligns; robot feet (`|_|`) extend one row below the
-// wordmark. The pageModel frame centers the whole block, so absolute
-// column padding here only matters relative to the two halves.
-const robotLogo = `   ___       __ _  __ _
-  [o.o]     / _' |/ _' |
-  /|=|\    | (_| | (_| |
- d |_| b    \__,_|\__, |
-   | |             |___/
-   |_|`
+// robotArt is the 6-row "Console Sprite": a robot whose head is a
+// terminal window — a small visual pun for a CLI tool. The eye row
+// (index 1) gets accent-rendered while the rest of the body is muted,
+// so the robot has a focal point without painting the whole sprite
+// in one flat color.
+const robotArt = `   _____
+  | o.o |
+  |_____|
+ /|  =  |\
+  |__|__|
+   |_|_|  `
+
+// agWordmark is the brand mark, rendered in figlet "Small" font with
+// the two glyphs smushed together (a's right stem dropped so the g's
+// leading slashes flow through). 4 visible rows + 1 descender row.
+// Note: backticks in the original `\__,` style figlet glyphs are
+// represented here via raw string + escapes since Go raw strings
+// can't contain backticks.
+const agWordmark = " __ ___ _\n" +
+	"/ _`/ _` |\n" +
+	"\\__,\\__, |\n" +
+	"     |___/"
+
+// renderWelcomeLogo renders the robot + ag wordmark side-by-side with
+// three coloring tiers: muted body, accent eye row, heading wordmark.
+func renderWelcomeLogo() string {
+	lines := strings.Split(robotArt, "\n")
+	for i, ln := range lines {
+		if i == 1 {
+			lines[i] = output.Style.Accent.Render(ln)
+		} else {
+			lines[i] = output.Style.Muted.Render(ln)
+		}
+	}
+	robot := strings.Join(lines, "\n")
+	wordmark := output.Style.Heading.Render(agWordmark)
+	return lipgloss.JoinHorizontal(lipgloss.Top, robot, "  ", wordmark)
+}
 
 // runWelcomePage shows the welcome screen and returns false if the
 // user picks "Cancel".
 func runWelcomePage(version, configPath, secretsPath string) (bool, error) {
-	header := output.Style.Accent.Render(robotLogo)
+	header := renderWelcomeLogo()
 
 	blurb := "ag dispatches between AI coding agents (Claude Code, Codex) and runs them in sandboxed OrbStack VMs by default. " +
 		"This wizard configures agent defaults, isolation mode, OrbStack/LM Studio integration, and credentials.\n\n" +
@@ -42,7 +68,7 @@ func runWelcomePage(version, configPath, secretsPath string) (bool, error) {
 	}, "\n"))
 
 	body := "\n" + header + "\n\n" +
-		output.Style.Bold.Render("Welcome to agent-helper.") + "\n\n" +
+		output.Style.Heading.Render("Welcome to agent-helper.") + "\n\n" +
 		output.InfoBox(blurb) + "\n\n" + meta + "\n"
 
 	choice := "begin"
@@ -97,7 +123,7 @@ func renderSummary(before, after Config, statuses []providerSummary, lmReachable
 		if after.Defaults.Isolated == "none" {
 			row("OrbStack", output.Style.Muted.Render("(not used — isolation=none)"), "")
 		} else {
-			row("OrbStack", "✓ Active", "")
+			row("OrbStack", output.Style.Success.Render("✓ Active"), "")
 			if len(after.Orb.DefaultPacks) > 0 {
 				row("Packs", strings.Join(after.Orb.DefaultPacks, ", "), packsDiff(before.Orb.DefaultPacks, after.Orb.DefaultPacks))
 			}
@@ -125,9 +151,9 @@ func renderSummary(before, after Config, statuses []providerSummary, lmReachable
 
 	section("Credentials")
 	if claudeReady {
-		row("Claude", "✓ OAuth token saved for VM use", "")
+		row("Claude", output.Style.Success.Render("✓ OAuth token saved for VM use"), "")
 	} else {
-		row("Claude", output.Style.Muted.Render("(not set up — VMs may need manual auth)"), "")
+		row("Claude", output.Style.Warning.Render("(not set up — VMs may need manual auth)"), "")
 	}
 
 	b.WriteString("\n")
@@ -157,7 +183,7 @@ func runApplyPage(summary string) (string, error) {
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewNote().
-				Title(output.Style.Bold.Render("Here's what you've configured:")).
+				Title(output.Style.Heading.Render("Here's what you've configured:")).
 				Description(summary),
 			huh.NewSelect[string]().
 				Title("").

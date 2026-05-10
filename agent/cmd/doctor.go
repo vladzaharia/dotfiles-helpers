@@ -20,8 +20,7 @@ var doctorCmd = &cobra.Command{
 		cfg := loadConfig()
 
 		fmt.Println()
-		fmt.Println("  OrbStack")
-		fmt.Println("  ────────")
+		fmt.Println("  " + output.SectionHeader("OrbStack", 56))
 		if !orb.IsInstalled() {
 			fmt.Println(output.StatusFail("orb CLI", "not on PATH — install OrbStack"))
 		} else if !orb.IsRunning() {
@@ -31,8 +30,7 @@ var doctorCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-		fmt.Println("  Providers (host)")
-		fmt.Println("  ────────────────")
+		fmt.Println("  " + output.SectionHeader("Providers (host)", 56))
 		for _, p := range provider.All() {
 			s := p.DetectHost()
 			detail := s.Detail
@@ -47,13 +45,11 @@ var doctorCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-		fmt.Println("  Auth (VM-ready)")
-		fmt.Println("  ───────────────")
+		fmt.Println("  " + output.SectionHeader("Auth (VM-ready)", 56))
 		printClaudeAuthSummary()
 
 		fmt.Println()
-		fmt.Println("  Sessions (live)")
-		fmt.Println("  ───────────────")
+		fmt.Println("  " + output.SectionHeader("Sessions (live)", 56))
 		state.PruneStale()
 		ses, _ := state.Sessions()
 		if len(ses) == 0 {
@@ -65,8 +61,7 @@ var doctorCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-		fmt.Println("  VMs (tracked)")
-		fmt.Println("  ─────────────")
+		fmt.Println("  " + output.SectionHeader("VMs (tracked)", 56))
 		vms, _ := state.VMs()
 		if len(vms) == 0 {
 			fmt.Println("  (none)")
@@ -81,8 +76,7 @@ var doctorCmd = &cobra.Command{
 		cands, _ := state.PruneCandidates(idleAfter)
 		if len(cands) > 0 {
 			fmt.Println()
-			fmt.Printf("  Idle (>%s)\n", idleAfter)
-			fmt.Println("  ─────────────")
+			fmt.Println("  " + output.SectionHeader(fmt.Sprintf("Idle (>%s)", idleAfter), 56))
 			for _, c := range cands {
 				marker := "(would prune)"
 				if doctorAuto {

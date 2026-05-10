@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/vladzaharia/dotfiles-helpers/agent/provider"
+	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
 
 var statusCmd = &cobra.Command{
@@ -16,8 +17,7 @@ var statusCmd = &cobra.Command{
 func runStatus(cmd *cobra.Command, args []string) error {
 	cfg := loadConfig()
 	fmt.Println()
-	fmt.Println("  Providers")
-	fmt.Println("  ─────────")
+	fmt.Println("  " + output.SectionHeader("Providers", 56))
 	statuses := []provider.Status{
 		provider.DetectClaude(),
 		provider.DetectCodex(),

@@ -15,13 +15,21 @@ import (
 // reasonable on both dark and light backgrounds; lipgloss/termenv falls
 // back to bold/underline distinctions when NO_COLOR is set.
 //
-// Roles are intentionally separated: a "secondary" string can be muted
-// (descriptive prose), subtle (help keys, diff hints), or a border —
-// these used to all collapse into one gray and the wizard read as flat.
+// Two tiers of gray are intentional:
+//   - Muted (245) is *readable secondary* prose — infobox bodies,
+//     deliberate "(not configured)" placeholders, action affordances
+//     like "[enter to install]". The user should still notice it.
+//   - Subtle (240) is *background hints* the eye should slide past —
+//     help-key footers, "(was X)" diff annotations, version metadata
+//     on the welcome page.
+//
+// If a row carries status (success / warning / error) it should use
+// the matching colored style, not Muted/Subtle. Demoting warnings to
+// gray was the main reason the CLI used to read as flat.
 var (
-	colorAccent  = lipgloss.Color("212") // charm pink/purple — accent / focused selection / spinner
-	colorMuted   = lipgloss.Color("245") // light gray — descriptive prose, infobox body
-	colorSubtle  = lipgloss.Color("240") // medium gray — help keys, "(was X)" diff hints
+	colorAccent  = lipgloss.Color("212") // charm pink/purple — accent / brand / focused selection / spinner
+	colorMuted   = lipgloss.Color("245") // light gray — readable secondary prose
+	colorSubtle  = lipgloss.Color("240") // medium gray — background hints (help keys, diff annotations)
 	colorBorder  = lipgloss.Color("99")  // soft indigo — infobox / panel borders
 	colorSuccess = lipgloss.Color("42")  // bright green — ✓ markers
 	colorWarning = lipgloss.Color("214") // amber — ⚠ markers
@@ -39,6 +47,7 @@ var Style = struct {
 	Error   lipgloss.Style
 	Loading lipgloss.Style
 	Bold    lipgloss.Style
+	Heading lipgloss.Style
 	InfoBox lipgloss.Style
 }{
 	Accent:  lipgloss.NewStyle().Foreground(colorAccent),
@@ -50,6 +59,7 @@ var Style = struct {
 	Error:   lipgloss.NewStyle().Foreground(colorError),
 	Loading: lipgloss.NewStyle().Foreground(colorAccent),
 	Bold:    lipgloss.NewStyle().Bold(true),
+	Heading: lipgloss.NewStyle().Foreground(colorAccent).Bold(true),
 	InfoBox: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorBorder).
@@ -121,16 +131,18 @@ func InfoBoxW(width int, s string) string {
 	return Style.InfoBox.Width(width).Render(s)
 }
 
-// SectionHeader returns "── Title ──" styled bold; used to delimit
-// sections within multi-section forms.
+// SectionHeader returns "── Title ──" with the title in accent + bold
+// (Style.Heading) and the dashes in plain bold; used to delimit sections
+// within multi-section forms and to head doctor/status output.
 func SectionHeader(title string, width int) string {
 	if width <= 0 {
 		width = 56
 	}
-	pre := "── " + title + " "
-	rest := width - lipgloss.Width(pre)
+	lead := "── "
+	gap := " "
+	rest := width - lipgloss.Width(lead+title+gap)
 	if rest < 3 {
 		rest = 3
 	}
-	return Style.Bold.Render(pre + strings.Repeat("─", rest))
+	return Style.Bold.Render(lead) + Style.Heading.Render(title) + Style.Bold.Render(gap+strings.Repeat("─", rest))
 }
