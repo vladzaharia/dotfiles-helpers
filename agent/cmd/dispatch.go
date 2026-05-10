@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"golang.org/x/term"
+
 	"github.com/vladzaharia/dotfiles-helpers/agent/args"
 	"github.com/vladzaharia/dotfiles-helpers/agent/orb"
 	"github.com/vladzaharia/dotfiles-helpers/agent/provider"
@@ -11,6 +13,31 @@ import (
 	"github.com/vladzaharia/dotfiles-helpers/agent/state"
 	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
+
+// interactiveStdio reports whether dispatch can prompt the user. Both
+// stdin and stderr need to be TTYs so huh forms render correctly.
+func interactiveStdio() bool {
+	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stderr.Fd()))
+}
+
+// mergeUnique returns a + (b - a) preserving order, no duplicates.
+func mergeUnique(a, b []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(a)+len(b))
+	for _, s := range a {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	for _, s := range b {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
+}
 
 func defaultModeFromConfig(s string) runner.Mode {
 	switch s {
@@ -45,6 +72,33 @@ func dispatch(providerName string, rawArgs []string, mutate func(*args.Parsed)) 
 
 	cwdForCfg, _ := os.Getwd()
 	cfg := loadEffectiveConfig(cwdForCfg)
+
+	// First-use per-directory: when this project doesn't yet have an
+	// .agent-helper.toml AND we're interactive AND the user didn't pass
+	// --no-detect, run the project setup wizard so isolation + packs
+	// match the project before we provision any VM.
+	if !noDetect && interactiveStdio() && findProjectConfig(cwdForCfg) == "" && cwdForCfg != "" {
+		shared, _ := orb.Find(providerName)
+		iso, packs, saved, err := PromptProjectSetup(cwdForCfg, cfg.Orb.DefaultPacks, shared != nil, cfg.Orb.MountRoots)
+		if err != nil {
+			output.Warn("project setup: %v", err)
+		} else if saved {
+			// Re-load effective config so the new file wins.
+			cfg = loadEffectiveConfig(cwdForCfg)
+		} else {
+			// Use detected values for this dispatch only.
+			cfg.Defaults.Isolated = iso
+			cfg.Orb.DefaultPacks = packs
+		}
+	} else if !noDetect {
+		// Non-interactive or --no-detect=false but project config is
+		// known: still augment cfg.Orb.DefaultPacks with project signals
+		// so VMs get the right toolchain even without the prompt.
+		detectedPacks, _ := orb.DetectProjectPacks(cwdForCfg)
+		if len(detectedPacks) > 0 {
+			cfg.Orb.DefaultPacks = mergeUnique(cfg.Orb.DefaultPacks, detectedPacks)
+		}
+	}
 
 	// Apply persisted secrets so EnvForward picks them up like any
 	// other host env var. The user's actual shell env always wins.

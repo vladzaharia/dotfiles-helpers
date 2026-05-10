@@ -49,5 +49,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.PersistentFlags().BoolVar(&refreshClaudeCreds, "refresh-creds", false,
 		"Re-extract Claude credentials from macOS Keychain (ignore cached ~/.claude/.credentials.json)")
+	rootCmd.PersistentFlags().BoolVar(&noDetect, "no-detect", false,
+		"Skip per-project isolation/pack auto-detection (use baseline config only)")
 	rootCmd.Version = version
 }
