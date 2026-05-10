@@ -43,6 +43,7 @@ homebrew_casks:
     repository:
       owner: vladzaharia
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "Unified AI coding agent dispatcher"
     hooks:
@@ -57,6 +58,7 @@ homebrew_casks:
     repository:
       owner: vladzaharia
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "HashiCorp Vault CLI helper (SSH certs, TOTP, env injection)"
     hooks:
@@ -73,6 +75,7 @@ homebrew_casks:
     repository:
       owner: vladzaharia
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "SOPS encryption/decryption CLI with glob support"
     hooks:
