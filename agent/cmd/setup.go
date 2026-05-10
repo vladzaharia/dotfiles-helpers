@@ -55,6 +55,7 @@ func init() {
 
 func runSetup(cmd *cobra.Command, args []string) error {
 	cfg := loadConfig()
+	cfgBefore := snapshotConfig(cfg)
 	ctx := cmd.Context()
 	if ctx == nil {
 		ctx = context.Background()
@@ -62,17 +63,28 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	interactive := !setupNonInteractive && term.IsTerminal(int(os.Stdin.Fd()))
 
+	// ── Welcome page ─────────────────────────────────────────────────
+	if interactive {
+		ok, err := runWelcomePage(version, configPathStr(), secretsPathStr())
+		if err != nil {
+			return err
+		}
+		if !ok {
+			output.Info("Setup cancelled. Nothing was saved.")
+			return nil
+		}
+	}
+
 	fmt.Println()
 	output.Info("Agent Helper Setup")
 	fmt.Println()
 
 	// ── Detect host providers ────────────────────────────────────────
 	fmt.Println("  Detecting providers...")
-	statuses := []provider.Status{
-		provider.DetectClaude(),
-		provider.DetectCodex(),
-		provider.DetectLMStudio(cfg.Local.URL),
-	}
+	claudeStatus := provider.DetectClaude()
+	codexStatus := provider.DetectCodex()
+	lmStatus := provider.DetectLMStudio(cfg.Local.URL)
+	statuses := []provider.Status{claudeStatus, codexStatus, lmStatus}
 	if ollama := provider.DetectOllama(); ollama.Installed {
 		statuses = append(statuses, ollama)
 	}
@@ -86,42 +98,56 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	// ── Step A: Defaults ─────────────────────────────────────────────
-	isolationOptions := []huh.Option[string]{
-		huh.NewOption("none — run on host", "none"),
-		huh.NewOption("shared — long-lived per-provider VM", "shared"),
-		huh.NewOption("full — dedicated ephemeral VM (recommended)", "full"),
+	// Filter agent options to only installed ones; if none installed,
+	// fall back to listing both with a "(not installed)" hint so the
+	// user can still pick a default.
+	agentOpts := []huh.Option[string]{}
+	if claudeStatus.Installed {
+		agentOpts = append(agentOpts, huh.NewOption("Claude Code", "claude"))
 	}
+	if codexStatus.Installed {
+		agentOpts = append(agentOpts, huh.NewOption("Codex CLI", "codex"))
+	}
+	if len(agentOpts) == 0 {
+		output.Warn("No coding agent CLIs detected. Install one with `brew install --cask claude-code` (or codex equivalent) and re-run setup.")
+		agentOpts = []huh.Option[string]{
+			huh.NewOption("Claude Code (install pending)", "claude"),
+			huh.NewOption("Codex CLI (install pending)", "codex"),
+		}
+	}
+
+	// Make the isolation prompt conditional on macOS — OrbStack is
+	// macOS-only today. We force isolation=none on Linux.
+	showIsolation := runtime.GOOS == "darwin"
+	if !showIsolation {
+		cfg.Defaults.Isolated = "none"
+	}
+
 	defaultsForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Default agent").
-				Options(
-					huh.NewOption("Claude Code", "claude"),
-					huh.NewOption("Codex CLI", "codex"),
-				).
+				Options(agentOpts...).
 				Value(&cfg.Defaults.Agent),
 		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Default isolation mode").
+				DescriptionFunc(func() string {
+					return isolationDescription(cfg.Defaults.Isolated)
+				}, &cfg.Defaults.Isolated).
+				Options(
+					huh.NewOption("none — run on host", "none"),
+					huh.NewOption("shared — long-lived per-provider VM", "shared"),
+					huh.NewOption("full — dedicated ephemeral VM (recommended)", "full"),
+				).
+				Value(&cfg.Defaults.Isolated),
+		).WithHideFunc(func() bool { return !showIsolation }),
 	)
 	if err := runForm(defaultsForm); err != nil {
 		return err
 	}
-
-	// Isolation is macOS-only (OrbStack) — skip on Linux and force "none".
-	if runtime.GOOS == "darwin" {
-		isoForm := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Default isolation mode").
-					Description("Where should agents run by default?").
-					Options(isolationOptions...).
-					Value(&cfg.Defaults.Isolated),
-			),
-		)
-		if err := runForm(isoForm); err != nil {
-			return err
-		}
-	} else {
-		cfg.Defaults.Isolated = "none"
+	if !showIsolation {
 		output.Info("Isolation modes require OrbStack (macOS only) — defaulting to none.")
 	}
 
@@ -159,12 +185,9 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		output.Warn("LM Studio setup: %v", err)
 	}
 
-	// ── Save before token flow so we don't lose work ─────────────────
-	if err := saveAndReport(&cfg); err != nil {
-		return err
-	}
-
 	// ── Step F: Claude credentials for VM use ────────────────────────
+	// We run this BEFORE the final save so the Apply page can show
+	// whether credentials are set up.
 	fmt.Println()
 	fmt.Println("  Claude credentials (for VM auth)")
 	fmt.Println("  ────────────────────────────────")
@@ -176,10 +199,46 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Println()
-	output.Success("Setup complete. Try `agent-helper doctor` to verify.")
-	fmt.Println()
+	// ── Apply page: user-friendly summary + diff + save ──────────────
+	provSummaries := []providerSummary{
+		{label: "Claude", summary: providerStatusLine(claudeStatus)},
+		{label: "Codex", summary: providerStatusLine(codexStatus)},
+	}
+	summary := renderSummary(cfgBefore, cfg, provSummaries, lmStatus.Installed, !needsClaudeAuthSetup())
+	choice, err := runApplyPage(summary)
+	if err != nil {
+		return err
+	}
+	switch choice {
+	case "save":
+		if err := saveAndReport(&cfg); err != nil {
+			return err
+		}
+		fmt.Println()
+		output.Success("Setup complete. Try `agent-helper doctor` to verify.")
+		fmt.Println()
+	case "back":
+		// User asked to go back — for the simple per-step structure we
+		// have today, "back" effectively means "abort without saving so
+		// you can re-run". Phase 2's structural rewrite enables real
+		// back-navigation between groups.
+		output.Info("Setup cancelled at summary. Re-run `agent-helper setup` to redo.")
+	default:
+		output.Info("Setup cancelled. Nothing was saved.")
+	}
 	return nil
+}
+
+// providerStatusLine renders a one-liner summary of detected provider
+// state for the Apply page summary.
+func providerStatusLine(s provider.Status) string {
+	if s.Installed {
+		if s.Detail != "" {
+			return "✓ Active · " + s.Detail
+		}
+		return "✓ Active"
+	}
+	return "(not installed)"
 }
 
 func saveAndReport(cfg *Config) error {
