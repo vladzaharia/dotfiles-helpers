@@ -3,8 +3,10 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	neturl "net/url"
 	"os"
 	"os/exec"
 	"regexp"
@@ -24,6 +26,19 @@ import (
 	"github.com/vladzaharia/dotfiles-helpers/internal/config"
 	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
+
+// runForm runs a huh form and converts user-abort (Ctrl-C / Esc) into
+// a clean process exit so callers don't have to check for ErrUserAborted
+// at every form.Run() site.
+func runForm(form *huh.Form) error {
+	err := form.Run()
+	if errors.Is(err, huh.ErrUserAborted) {
+		fmt.Fprintln(os.Stderr)
+		output.Warn("Setup interrupted; nothing further was saved.")
+		os.Exit(130)
+	}
+	return err
+}
 
 var setupNonInteractive bool
 
@@ -87,7 +102,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 				Value(&cfg.Defaults.Agent),
 		),
 	)
-	if err := defaultsForm.Run(); err != nil {
+	if err := runForm(defaultsForm); err != nil {
 		return err
 	}
 
@@ -102,7 +117,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 					Value(&cfg.Defaults.Isolated),
 			),
 		)
-		if err := isoForm.Run(); err != nil {
+		if err := runForm(isoForm); err != nil {
 			return err
 		}
 	} else {
@@ -113,7 +128,17 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	// ── Step B: OrbStack auto-install (macOS, isolation != none) ─────
 	if runtime.GOOS == "darwin" && cfg.Defaults.Isolated != "none" {
 		if err := promptOrbStackInstall(ctx); err != nil {
+			// Install failed AND user wanted a VM mode. Downgrade isolation
+			// to "none" so we don't save a config that promises a VM
+			// runtime that will fail at first dispatch. The user can
+			// re-run setup once OrbStack is sorted out.
 			output.Warn("OrbStack setup: %v", err)
+			output.Warn("Falling back to isolation=none for now. Install OrbStack manually and re-run `agent-helper setup orb`.")
+			cfg.Defaults.Isolated = "none"
+		} else if !orb.IsInstalled() {
+			// User declined the install prompt — same fallback so the
+			// saved config stays consistent with what's actually possible.
+			cfg.Defaults.Isolated = "none"
 		}
 	}
 
@@ -181,7 +206,7 @@ func promptOrbStackInstall(ctx context.Context) error {
 				Value(&install),
 		),
 	)
-	if err := form.Run(); err != nil {
+	if err := runForm(form); err != nil {
 		return err
 	}
 	if !install {
@@ -232,7 +257,7 @@ func promptPacksAndMounts(cfg *Config) error {
 				Value(&mounts),
 		),
 	)
-	if err := form.Run(); err != nil {
+	if err := runForm(form); err != nil {
 		return err
 	}
 	cfg.Orb.MountRoots = splitCSV(mounts)
@@ -271,7 +296,7 @@ func promptProviderOverrides(cfg *Config) error {
 					Value(&current),
 			),
 		)
-		if err := form.Run(); err != nil {
+		if err := runForm(form); err != nil {
 			return err
 		}
 		entry := cfg.Providers[name]
@@ -282,24 +307,25 @@ func promptProviderOverrides(cfg *Config) error {
 }
 
 func promptLMStudio(ctx context.Context, cfg *Config) error {
-	url := cfg.Local.URL
+	urlValue := cfg.Local.URL
 	urlForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("LM Studio URL").
 				Description("HTTP endpoint for `--local` mode. Default is http://127.0.0.1:1234.").
-				Value(&url),
+				Validate(validateLMStudioURL).
+				Value(&urlValue),
 		),
 	)
-	if err := urlForm.Run(); err != nil {
+	if err := runForm(urlForm); err != nil {
 		return err
 	}
-	cfg.Local.URL = strings.TrimSpace(url)
+	cfg.Local.URL = strings.TrimSpace(urlValue)
 
 	client := &lmstudio.Client{URL: cfg.Local.URL}
 	models, err := client.Models()
 	if err != nil || len(models) == 0 {
-		var configure bool
+		var skip bool
 		msg := "LM Studio isn't reachable at that URL."
 		if err == nil {
 			msg = "LM Studio reachable but reports no models."
@@ -311,17 +337,25 @@ func promptLMStudio(ctx context.Context, cfg *Config) error {
 					Description("Skip local model setup for now? You can re-run `agent-helper setup` later.").
 					Affirmative("Skip").
 					Negative("Retry").
-					Value(&configure),
+					Value(&skip),
 			),
 		)
-		if formErr := skipForm.Run(); formErr != nil {
+		if formErr := runForm(skipForm); formErr != nil {
 			return formErr
 		}
-		if configure {
+		if skip {
 			return nil
 		}
-		// Retry once.
-		models, err = client.Models()
+		// Poll up to 3 times at 1s intervals so the user has a window to
+		// start LM Studio or load a model between Retry and the actual
+		// next probe.
+		for i := 0; i < 3; i++ {
+			time.Sleep(1 * time.Second)
+			models, err = client.Models()
+			if err == nil && len(models) > 0 {
+				break
+			}
+		}
 		if err != nil || len(models) == 0 {
 			output.Warn("Still no models — skipping. Use `agent-helper config edit` to set later.")
 			return nil
@@ -363,6 +397,15 @@ func promptLMStudio(ctx context.Context, cfg *Config) error {
 				pick = cfg.Local.Models.Opus
 			}
 		}
+		// Stale-pick safety: if the previously-saved model is no longer in
+		// LM Studio's current options, drop it so huh doesn't render a
+		// broken pre-selection.
+		if pick != "" && !optionsContain(opts, pick) {
+			pick = ""
+			if suggested := lmstudio.Suggest(models, tier); suggested != nil {
+				pick = suggested.ID
+			}
+		}
 
 		title := fmt.Sprintf("Pick a %s-tier model", tier.String())
 		desc := tierDescription(tier)
@@ -379,7 +422,7 @@ func promptLMStudio(ctx context.Context, cfg *Config) error {
 					Value(&pick),
 			),
 		)
-		if err := form.Run(); err != nil {
+		if err := runForm(form); err != nil {
 			return err
 		}
 		switch tier {
@@ -401,6 +444,44 @@ func promptLMStudio(ctx context.Context, cfg *Config) error {
 				break
 			}
 		}
+	}
+	return nil
+}
+
+// optionsContain reports whether the slice of huh select options
+// contains an option whose Value equals v. Used to detect stale model
+// IDs (saved in config but no longer offered by LM Studio).
+func optionsContain(opts []huh.Option[string], v string) bool {
+	for _, o := range opts {
+		if o.Value == v {
+			return true
+		}
+	}
+	return false
+}
+
+// validateLMStudioURL ensures the input parses as an HTTP/HTTPS URL with
+// a host, and warns about the common HTTPS-on-localhost mistake (LM
+// Studio serves plain HTTP locally; a stray "https://" otherwise hides
+// itself as a TLS handshake error later).
+func validateLMStudioURL(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return fmt.Errorf("URL is required")
+	}
+	u, err := neturl.Parse(s)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL must use http:// or https://")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("URL needs a host (e.g. 127.0.0.1:1234)")
+	}
+	host := u.Hostname()
+	if u.Scheme == "https" && (host == "127.0.0.1" || host == "localhost" || host == "::1") {
+		return fmt.Errorf("LM Studio serves plain HTTP locally; use http:// not https:// for %s", host)
 	}
 	return nil
 }
@@ -452,7 +533,7 @@ func promptClaudeAuth() error {
 				Value(&choice),
 		),
 	)
-	if err := form.Run(); err != nil {
+	if err := runForm(form); err != nil {
 		return err
 	}
 	switch choice {
@@ -472,6 +553,12 @@ func runClaudeSetupTokenInteractive() error {
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w", err)
 	}
+	// Pre-flight: ensure secrets file path is writable before running the
+	// 30-second browser OAuth flow. Catches permission/disk issues early
+	// so the user doesn't authorize and then lose the token.
+	if err := ensureSecretsWritable(); err != nil {
+		return fmt.Errorf("can't save secrets to %s: %w", secretsPath(), err)
+	}
 	output.Info("Running `claude setup-token` — a browser will open. Authorize and copy the token.")
 	cmd := exec.Command(binPath, "setup-token")
 	cmd.Stdin = os.Stdin
@@ -490,15 +577,27 @@ func runClaudeSetupTokenInteractive() error {
 			huh.NewGroup(
 				huh.NewInput().
 					Title("Token not auto-detected").
-					Description("Paste the token printed above.").
+					Description("Paste the token printed above (starts with sk-ant-oat).").
 					EchoMode(huh.EchoModePassword).
+					Validate(func(s string) error {
+						s = strings.TrimSpace(s)
+						if s == "" {
+							return fmt.Errorf("token is required")
+						}
+						if !tokenRE.MatchString(s) {
+							return fmt.Errorf("doesn't look like a Claude OAuth token (expected sk-ant-oat...)")
+						}
+						return nil
+					}).
 					Value(&manual),
 			),
 		)
-		if formErr := form.Run(); formErr != nil {
+		if formErr := runForm(form); formErr != nil {
 			return formErr
 		}
-		token = strings.TrimSpace(manual)
+		// Validation guarantees a match; extract just the token portion in
+		// case the user pasted surrounding whitespace or context.
+		token = tokenRE.FindString(manual)
 	}
 	if token == "" {
 		return fmt.Errorf("no token captured")

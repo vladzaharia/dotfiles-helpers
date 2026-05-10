@@ -76,16 +76,28 @@ func installViaDMG(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("hdiutil attach: %w", err)
 	}
-	mount := parseHdiutilMount(string(attachOut))
-	if mount == "" {
-		return fmt.Errorf("could not determine OrbStack mount point from hdiutil output")
+
+	// Register detach using whichever identifier we can extract first
+	// (device or mount point) so a parse failure later doesn't leak the
+	// attached disk image.
+	device, mount := parseHdiutilAttach(string(attachOut))
+	detachID := mount
+	if detachID == "" {
+		detachID = device
+	}
+	if detachID == "" {
+		return fmt.Errorf("could not parse hdiutil attach output: %q", string(attachOut))
 	}
 	defer func() {
-		detach := exec.Command("hdiutil", "detach", "-quiet", mount)
+		detach := exec.Command("hdiutil", "detach", "-quiet", detachID)
 		detach.Stdout = w
 		detach.Stderr = w
 		_ = detach.Run()
 	}()
+
+	if mount == "" {
+		return fmt.Errorf("hdiutil attached %s but no /Volumes mount point appeared", device)
+	}
 
 	src := filepath.Join(mount, "OrbStack.app")
 	dst := "/Applications/OrbStack.app"
@@ -103,24 +115,46 @@ func installViaDMG(ctx context.Context, w io.Writer) error {
 	if err := cp.Run(); err != nil {
 		return fmt.Errorf("copy OrbStack.app: %w", err)
 	}
+
+	// Strip Gatekeeper quarantine so OrbStack launches without the
+	// "downloaded from the internet" prompt that would otherwise block
+	// our daemon-start wait.
+	xattr := exec.CommandContext(ctx, "/usr/bin/xattr", "-dr", "com.apple.quarantine", dst)
+	xattr.Stdout = w
+	xattr.Stderr = w
+	if err := xattr.Run(); err != nil {
+		// Non-fatal: copy succeeded; quarantine strip is best-effort.
+		fmt.Fprintf(w, "  warning: could not strip quarantine attribute: %v\n", err)
+	}
 	return nil
 }
 
-// parseHdiutilMount extracts the mount-point column from `hdiutil attach`
-// plain-text output. Each line is "<device>\t<content>\t<mount>"; the
-// OrbStack volume is the line whose mount-point is non-empty.
-func parseHdiutilMount(out string) string {
+// parseHdiutilAttach extracts both the disk device and the /Volumes
+// mount point from `hdiutil attach` plain-text output. Each output line
+// is "<device>\t<content>\t<mount>". The first device on the first line
+// is returned; the mount point is the first /Volumes/* path found.
+//
+// Either field may be empty if hdiutil's output deviates from the
+// expected format (older macOS versions, locale changes). Callers must
+// fall back gracefully when one side is missing.
+func parseHdiutilAttach(out string) (device, mount string) {
 	for _, line := range strings.Split(out, "\n") {
 		fields := strings.Split(line, "\t")
-		if len(fields) < 3 {
+		if len(fields) == 0 {
 			continue
 		}
-		mp := strings.TrimSpace(fields[len(fields)-1])
-		if strings.HasPrefix(mp, "/Volumes/") {
-			return mp
+		dev := strings.TrimSpace(fields[0])
+		if device == "" && strings.HasPrefix(dev, "/dev/") {
+			device = dev
+		}
+		if len(fields) >= 3 {
+			mp := strings.TrimSpace(fields[len(fields)-1])
+			if mount == "" && strings.HasPrefix(mp, "/Volumes/") {
+				mount = mp
+			}
 		}
 	}
-	return ""
+	return
 }
 
 // WaitForDaemon polls IsRunning until it succeeds or `timeout` elapses.

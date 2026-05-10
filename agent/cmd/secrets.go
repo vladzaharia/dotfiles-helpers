@@ -37,6 +37,24 @@ func LoadSecrets() (Secrets, error) {
 	return s, err
 }
 
+// ensureSecretsWritable creates the config directory if missing and
+// confirms a 0600 file can be written there. Used as a pre-flight before
+// long interactive credential flows so we fail fast on permission/disk
+// issues rather than after the user has authorized in a browser.
+func ensureSecretsWritable() error {
+	dir := config.Dir("agent-helper")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	probe := filepath.Join(dir, ".write-probe")
+	f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	f.Close()
+	return os.Remove(probe)
+}
+
 // SaveSecrets writes the secrets file with mode 0600.
 func SaveSecrets(s Secrets) error {
 	dir := config.Dir("agent-helper")
