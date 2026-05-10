@@ -97,3 +97,18 @@ case "${1:-all}" in
         exit 1
         ;;
 esac
+
+# Auto-run setup right after agent-helper lands so users go straight
+# from `curl … | bash` to a working configuration. Suppressed when:
+#  • RUN_SETUP=0                 (CI / scripted installs)
+#  • stdin or stdout isn't a TTY (piped / redirected)
+#  • the user picked something other than agent-helper / all
+TARGET="${1:-all}"
+if [[ "${RUN_SETUP:-1}" == "1" ]] \
+   && [[ -t 0 ]] && [[ -t 1 ]] \
+   && [[ "$TARGET" == "agent-helper" || "$TARGET" == "all" ]] \
+   && [[ -x "$INSTALL_DIR/agent-helper" ]]; then
+    echo
+    echo "Running first-time setup..."
+    exec "$INSTALL_DIR/agent-helper" setup
+fi

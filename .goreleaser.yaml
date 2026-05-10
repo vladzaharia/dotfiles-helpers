@@ -46,6 +46,10 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "Unified AI coding agent dispatcher"
+    caveats: |
+      Run `agent-helper setup` (or just `ag`) to configure on first use.
+      The wizard walks you through agent selection, isolation mode,
+      OrbStack/LM Studio integration, and credentials.
     hooks:
       post:
         install: |
@@ -61,6 +65,10 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "HashiCorp Vault CLI helper (SSH certs, TOTP, env injection)"
+    caveats: |
+      Aliases installed: vh, vlogin, vssh, vmosh, votp, vtoken, vnv, vdocker.
+      Run `vh --help` to get started. Configure VAULT_ADDR / VAULT_TOKEN
+      in your shell rc to point at your Vault instance.
     hooks:
       post:
         install: |
@@ -78,6 +86,9 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/vladzaharia/dotfiles-helpers
     description: "SOPS encryption/decryption CLI with glob support"
+    caveats: |
+      Alias installed: crypto. Run `crypto --help` to get started.
+      Requires sops + at least one configured age key or KMS binding.
     hooks:
       post:
         install: |
