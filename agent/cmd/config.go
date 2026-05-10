@@ -22,9 +22,18 @@ type DefaultsConfig struct {
 
 // LocalConfig describes the host-side LM Studio binding for `--local`.
 type LocalConfig struct {
-	Provider     string `toml:"provider"`
-	URL          string `toml:"url"`
-	DefaultModel string `toml:"default_model"` // empty = auto-pick (Phase 7)
+	Provider     string         `toml:"provider"`
+	URL          string         `toml:"url"`
+	DefaultModel string         `toml:"default_model"` // empty = auto-pick (Phase 7)
+	Models       LocalModelTier `toml:"models"`
+}
+
+// LocalModelTier maps Anthropic-family tiers to local LM Studio model ids.
+// Empty fields mean "no preference / fall back to DefaultModel".
+type LocalModelTier struct {
+	Haiku  string `toml:"haiku"`
+	Sonnet string `toml:"sonnet"`
+	Opus   string `toml:"opus"`
 }
 
 // ProviderConfig is per-provider overrides (e.g. cached real-binary path

@@ -3,12 +3,63 @@ set -euo pipefail
 
 REPO="vladzaharia/dotfiles-helpers"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+TOOLS=(agent-helper vault-helper sops-helper)
+
+usage() {
+    cat <<EOF
+Usage: install.sh [tool|all|--help|--list]
+
+Tools:
+$(printf '  %s\n' "${TOOLS[@]}")
+  all                Install every tool (default)
+
+Flags:
+  --help, -h         Show this help
+  --list             List supported tools
+
+Environment:
+  INSTALL_DIR        Target directory (default: \$HOME/.local/bin)
+EOF
+}
+
+case "${1:-all}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    --list)
+        printf '%s\n' "${TOOLS[@]}"
+        exit 0
+        ;;
+esac
+
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 [[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
 [[ "$ARCH" == "aarch64" ]] && ARCH="arm64"
 
-VERSION=$(curl -sSf "https://api.github.com/repos/$REPO/releases/latest" | grep tag_name | cut -d'"' -f4)
+case "$OS" in
+    darwin|linux) ;;
+    *)
+        echo "error: unsupported OS '$OS'" >&2
+        exit 1
+        ;;
+esac
+
+case "$ARCH" in
+    amd64|arm64) ;;
+    *)
+        echo "error: unsupported arch '$ARCH'" >&2
+        exit 1
+        ;;
+esac
+
+VERSION=$(curl -sSf "https://api.github.com/repos/$REPO/releases/latest" | grep tag_name | cut -d'"' -f4 || true)
+if [[ -z "$VERSION" ]]; then
+    echo "error: could not resolve latest release (GitHub API rate-limit or network failure)" >&2
+    echo "       browse https://github.com/$REPO/releases for manual download" >&2
+    exit 1
+fi
 
 install_tool() {
     local tool="$1"
@@ -35,12 +86,14 @@ case "${1:-all}" in
         ln -sf "$INSTALL_DIR/sops-helper" "$INSTALL_DIR/crypto"
         ;;
     all)
-        "$0" agent-helper
-        "$0" vault-helper
-        "$0" sops-helper
+        for t in "${TOOLS[@]}"; do
+            "$0" "$t"
+        done
         ;;
     *)
-        echo "Usage: $0 [agent-helper|vault-helper|sops-helper|all]"
+        echo "error: unknown tool '$1'" >&2
+        echo >&2
+        usage >&2
         exit 1
         ;;
 esac

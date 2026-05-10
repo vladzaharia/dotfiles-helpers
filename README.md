@@ -4,9 +4,9 @@ A trio of Go CLIs I use across my machines:
 
 | Tool | Purpose | Aliases |
 |------|---------|---------|
-| **agent-helper** | Unified dispatcher for AI coding agents (Claude, Codex, etc.) | `ag` |
-| **vault-helper** | HashiCorp Vault helper — SSH certs, TOTP, env injection, Docker creds | `vh`, `vlogin`, `vssh`, `vmosh`, `votp`, `vtoken`, `vnv`, `vdocker` |
-| **sops-helper** | SOPS encrypt/decrypt with glob support | `crypto` |
+| [**agent-helper**](cmd/agent-helper/README.md) | Unified dispatcher for AI coding agents (Claude, Codex, etc.) | `ag` |
+| [**vault-helper**](cmd/vault-helper/README.md) | HashiCorp Vault helper — SSH certs, TOTP, env injection, Docker creds *(WIP)* | `vh`, `vlogin`, `vssh`, `vmosh`, `votp`, `vtoken`, `vnv`, `vdocker` |
+| [**sops-helper**](cmd/sops-helper/README.md) | SOPS encrypt/decrypt with glob support *(WIP)* | `crypto` |
 
 Releases are built by [goreleaser](https://goreleaser.com) for macOS and Linux on `amd64` and `arm64`.
 
