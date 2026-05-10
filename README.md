@@ -76,3 +76,35 @@ ag --help
 vh --help
 crypto --help
 ```
+
+## Development
+
+A `Makefile` at the root and per-helper Makefiles under `cmd/<helper>/` cover the common loops:
+
+```sh
+make help                          # list all root targets
+make test                          # go test ./...
+make build                         # go build ./...
+make vet tidy lint                 # go vet, go mod tidy, golangci-lint
+make clean                         # rm dist/ and per-helper bin/
+
+cd cmd/agent-helper && make run ARGS="--help"   # build & run one helper
+cd cmd/agent-helper && make install             # go install to $GOBIN
+```
+
+## Releasing (maintainer)
+
+All three helpers ship together under one `vX.Y.Z` tag — `make release` is the one-command flow:
+
+```sh
+make release          # patch bump (0.6.3 → 0.6.4)
+make release-minor    # minor bump (0.6.3 → 0.7.0)
+make release-major    # major bump
+make release-dry      # local goreleaser snapshot — no tag, no push
+```
+
+The script (`scripts/release.sh`) preflights a clean tree, the `main` branch, sync with origin, and `go test`, then shows a changelog preview and asks before tagging. CI (`.github/workflows/release.yml`) takes over on push: goreleaser builds artifacts for all three helpers, publishes the GitHub release, and bumps the brew tap. After CI completes:
+
+```sh
+brew upgrade --cask agent-helper vault-helper sops-helper
+```
