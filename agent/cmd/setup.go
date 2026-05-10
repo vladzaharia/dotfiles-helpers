@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	neturl "net/url"
@@ -15,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	iexec "github.com/vladzaharia/dotfiles-helpers/internal/exec"
@@ -27,17 +27,25 @@ import (
 	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
 
-// runForm runs a huh form and converts user-abort (Ctrl-C / Esc) into
-// a clean process exit so callers don't have to check for ErrUserAborted
-// at every form.Run() site.
+// runForm runs a huh form inside the shared pageModel frame so every
+// wizard step takes over the alternate screen and renders centered.
+// Ctrl-C / Esc is translated into a clean process exit (130) so callers
+// don't have to handle ErrUserAborted everywhere.
 func runForm(form *huh.Form) error {
-	err := form.Run()
-	if errors.Is(err, huh.ErrUserAborted) {
+	page := newPage(form)
+	prog := tea.NewProgram(page,
+		tea.WithAltScreen(),
+		tea.WithOutput(os.Stderr),
+	)
+	if _, err := prog.Run(); err != nil {
+		return err
+	}
+	if form.State == huh.StateAborted {
 		fmt.Fprintln(os.Stderr)
 		output.Warn("Setup interrupted; nothing further was saved.")
 		os.Exit(130)
 	}
-	return err
+	return nil
 }
 
 var setupNonInteractive bool

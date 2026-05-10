@@ -69,7 +69,7 @@ func RenderLMStudioPanel(st LMStudioState) string {
 
 	b.WriteString(output.Style.Error.Render("  ✗ Could not reach LM Studio\n"))
 	if st.Error != "" {
-		b.WriteString(output.Style.Dim.Render("    " + truncErr(st.Error) + "\n"))
+		b.WriteString(output.Style.Muted.Render("    " + truncErr(st.Error) + "\n"))
 	}
 	b.WriteString("\n")
 	b.WriteString(output.InfoBox(troubleshootingTextFor(st)))

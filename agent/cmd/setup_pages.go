@@ -12,15 +12,18 @@ import (
 	"github.com/vladzaharia/dotfiles-helpers/internal/output"
 )
 
-// robotLogo is the welcome ASCII art (robot head + "ag" slant logo).
-// Robot is 7 rows; logo is 5 rows with one blank top row so it
-// visually centers against the robot.
-const robotLogo = `   T___
-  |O O|     ___________________
-  \_^_/     |_  ____/__  /|
- /|(\)|\    |  / __  _  ___
-d |___| b   / /_/ /  /_/  |_
-  .'._.'.   \____/
+// robotLogo is the welcome ASCII art: a 7-row robot beside a 5-row
+// stylized "ag" wordmark. The wordmark sits on robot rows 1–5 so the
+// letterforms align with the robot's head/body and the robot's feet
+// (rows 6–7) extend below — the pageModel frame centers the whole
+// composition on screen, so this string only needs to look right
+// internally; absolute column padding doesn't matter.
+const robotLogo = `   T___       __ _    __ _
+  |O O|      / _' |  / _' |
+  \_^_/     | (_| | | (_| |
+ /|(\)|\     \__,_|  \__, |
+d |___| b               |_|
+  .'._.'.
   |_| |_|`
 
 // runWelcomePage shows the welcome screen and returns false if the
@@ -32,14 +35,15 @@ func runWelcomePage(version, configPath, secretsPath string) (bool, error) {
 		"This wizard configures agent defaults, isolation mode, OrbStack/LM Studio integration, and credentials.\n\n" +
 		"You can re-run any section later with `agent-helper setup <section>`."
 
-	meta := output.Style.Dim.Render(strings.Join([]string{
+	meta := output.Style.Subtle.Render(strings.Join([]string{
 		fmt.Sprintf("version    %s", version),
 		fmt.Sprintf("config     %s", configPath),
 		fmt.Sprintf("secrets    %s  (mode 0600)", secretsPath),
 	}, "\n"))
 
-	body := header + "\n\nWelcome to agent-helper.\n\n" +
-		output.InfoBox(blurb) + "\n\n" + meta
+	body := "\n" + header + "\n\n" +
+		output.Style.Bold.Render("Welcome to agent-helper.") + "\n\n" +
+		output.InfoBox(blurb) + "\n\n" + meta + "\n"
 
 	choice := "begin"
 	form := huh.NewForm(
@@ -74,7 +78,7 @@ func renderSummary(before, after Config, statuses []providerSummary, lmReachable
 	row := func(label, value, was string) {
 		line := fmt.Sprintf("  %-12s %s", label, value)
 		if was != "" {
-			line += output.Style.Dim.Render("  (was " + was + ")")
+			line += output.Style.Subtle.Render("  (was " + was + ")")
 		}
 		b.WriteString(line + "\n")
 	}
@@ -91,7 +95,7 @@ func renderSummary(before, after Config, statuses []providerSummary, lmReachable
 	if runtime.GOOS == "darwin" {
 		section("VMs")
 		if after.Defaults.Isolated == "none" {
-			row("OrbStack", output.Style.Dim.Render("(not used — isolation=none)"), "")
+			row("OrbStack", output.Style.Muted.Render("(not used — isolation=none)"), "")
 		} else {
 			row("OrbStack", "✓ Active", "")
 			if len(after.Orb.DefaultPacks) > 0 {
@@ -116,14 +120,14 @@ func renderSummary(before, after Config, statuses []providerSummary, lmReachable
 			row("  Opus", after.Local.Models.Opus, diffWas(before.Local.Models.Opus, after.Local.Models.Opus, identity))
 		}
 	} else {
-		row("LM Studio", output.Style.Dim.Render("(not configured)"), "")
+		row("LM Studio", output.Style.Muted.Render("(not configured)"), "")
 	}
 
 	section("Credentials")
 	if claudeReady {
 		row("Claude", "✓ OAuth token saved for VM use", "")
 	} else {
-		row("Claude", output.Style.Dim.Render("(not set up — VMs may need manual auth)"), "")
+		row("Claude", output.Style.Muted.Render("(not set up — VMs may need manual auth)"), "")
 	}
 
 	b.WriteString("\n")

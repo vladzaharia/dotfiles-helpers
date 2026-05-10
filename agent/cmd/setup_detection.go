@@ -95,16 +95,19 @@ func runDetectionCard(ctx context.Context, lmURL string) (*DetectionResult, erro
 		lmURL: lmURL,
 	}
 
-	p := tea.NewProgram(&m, tea.WithContext(ctx), tea.WithOutput(os.Stderr))
-	final, err := p.Run()
-	if err != nil {
+	page := newPage(&m)
+	p := tea.NewProgram(page,
+		tea.WithContext(ctx),
+		tea.WithOutput(os.Stderr),
+		tea.WithAltScreen(),
+	)
+	if _, err := p.Run(); err != nil {
 		return nil, err
 	}
-	fm := final.(*detectionCardModel)
-	if fm.cancelled {
+	if m.cancelled {
 		return nil, fmt.Errorf("detection cancelled")
 	}
-	return fm.result(), nil
+	return m.result(), nil
 }
 
 type detectionCardModel struct {
@@ -277,7 +280,7 @@ func (m *detectionCardModel) View() string {
 		b.WriteString("\n")
 	}
 
-	help := output.Style.Dim.Render("↑↓ navigate · enter act · c continue · q quit")
+	help := output.Style.Subtle.Render("↑↓ navigate · enter act · c continue · q quit")
 	b.WriteString(help)
 	return b.String()
 }
@@ -307,19 +310,19 @@ func (m *detectionCardModel) renderStatus(r toolRow) string {
 		}
 		return output.Style.Success.Render("✓ Active") + ver + auth
 	case rowNotLoggedIn:
-		return output.Style.Warning.Render("⚠ Installed, not logged in") + output.Style.Dim.Render("  [enter to log in]")
+		return output.Style.Warning.Render("⚠ Installed, not logged in") + output.Style.Subtle.Render("  [enter to log in]")
 	case rowNotInstalled:
-		return output.Style.Error.Render("✗ Not installed") + output.Style.Dim.Render("  [enter to install]")
+		return output.Style.Error.Render("✗ Not installed") + output.Style.Subtle.Render("  [enter to install]")
 	case rowNotReachable:
-		return output.Style.Warning.Render("— Not reachable at "+r.detail) + output.Style.Dim.Render("  [enter to retry]")
+		return output.Style.Warning.Render("— Not reachable at "+r.detail) + output.Style.Subtle.Render("  [enter to retry]")
 	case rowInstalling:
 		return output.Style.Loading.Render(spinnerFrames[m.tick%len(spinnerFrames)] + " Installing…")
 	case rowInstallFailed:
-		return output.Style.Error.Render("✗ Install failed") + output.Style.Dim.Render("  [enter to retry]")
+		return output.Style.Error.Render("✗ Install failed") + output.Style.Subtle.Render("  [enter to retry]")
 	case rowLoggingIn:
 		return output.Style.Loading.Render(spinnerFrames[m.tick%len(spinnerFrames)] + " Waiting for browser auth…")
 	case rowLoginFailed:
-		return output.Style.Error.Render("✗ Login failed") + output.Style.Dim.Render("  [enter to retry]")
+		return output.Style.Error.Render("✗ Login failed") + output.Style.Subtle.Render("  [enter to retry]")
 	}
 	return ""
 }

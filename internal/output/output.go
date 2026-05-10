@@ -14,9 +14,15 @@ import (
 // Color palette. Numeric codes are 256-color palette indices that look
 // reasonable on both dark and light backgrounds; lipgloss/termenv falls
 // back to bold/underline distinctions when NO_COLOR is set.
+//
+// Roles are intentionally separated: a "secondary" string can be muted
+// (descriptive prose), subtle (help keys, diff hints), or a border —
+// these used to all collapse into one gray and the wizard read as flat.
 var (
-	colorAccent  = lipgloss.Color("212") // charm pink/purple — accent / focused selection
-	colorDim     = lipgloss.Color("240") // medium gray — informational / loading
+	colorAccent  = lipgloss.Color("212") // charm pink/purple — accent / focused selection / spinner
+	colorMuted   = lipgloss.Color("245") // light gray — descriptive prose, infobox body
+	colorSubtle  = lipgloss.Color("240") // medium gray — help keys, "(was X)" diff hints
+	colorBorder  = lipgloss.Color("99")  // soft indigo — infobox / panel borders
 	colorSuccess = lipgloss.Color("42")  // bright green — ✓ markers
 	colorWarning = lipgloss.Color("214") // amber — ⚠ markers
 	colorError   = lipgloss.Color("196") // red — ✗ markers
@@ -25,7 +31,9 @@ var (
 // Style exposes the named styles used across the CLI.
 var Style = struct {
 	Accent  lipgloss.Style
-	Dim     lipgloss.Style
+	Muted   lipgloss.Style
+	Subtle  lipgloss.Style
+	Border  lipgloss.Style
 	Success lipgloss.Style
 	Warning lipgloss.Style
 	Error   lipgloss.Style
@@ -34,16 +42,18 @@ var Style = struct {
 	InfoBox lipgloss.Style
 }{
 	Accent:  lipgloss.NewStyle().Foreground(colorAccent),
-	Dim:     lipgloss.NewStyle().Foreground(colorDim),
+	Muted:   lipgloss.NewStyle().Foreground(colorMuted),
+	Subtle:  lipgloss.NewStyle().Foreground(colorSubtle),
+	Border:  lipgloss.NewStyle().Foreground(colorBorder),
 	Success: lipgloss.NewStyle().Foreground(colorSuccess),
 	Warning: lipgloss.NewStyle().Foreground(colorWarning),
 	Error:   lipgloss.NewStyle().Foreground(colorError),
-	Loading: lipgloss.NewStyle().Foreground(colorDim),
+	Loading: lipgloss.NewStyle().Foreground(colorAccent),
 	Bold:    lipgloss.NewStyle().Bold(true),
 	InfoBox: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorDim).
-		Foreground(colorDim).
+		BorderForeground(colorBorder).
+		Foreground(colorMuted).
 		Padding(0, 1),
 }
 
@@ -55,7 +65,7 @@ var (
 	statusOK    = Style.Success.Render("✓")
 	statusFail  = Style.Error.Render("✗")
 	statusWarn  = Style.Warning.Render("⚠")
-	statusNone  = Style.Dim.Render("·")
+	statusNone  = Style.Subtle.Render("·")
 )
 
 // Info / Success / Warn / Error print one styled line to stderr.
