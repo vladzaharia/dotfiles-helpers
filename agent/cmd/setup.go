@@ -79,8 +79,20 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	output.Info("Agent Helper Setup")
 	fmt.Println()
 
-	// ── Detect host providers ────────────────────────────────────────
-	fmt.Println("  Detecting providers...")
+	// ── Page 1: live detection card (interactive only) ───────────────
+	// In interactive mode the Bubble Tea card lets users act on
+	// detection results inline (install missing tools, etc.). In
+	// non-interactive mode we fall back to a procedural sweep so CI
+	// runs still produce a reasonable status summary.
+	if interactive {
+		if _, err := runDetectionCard(ctx, cfg.Local.URL); err != nil {
+			output.Warn("detection card: %v (falling back to procedural detection)", err)
+		}
+		fmt.Println()
+	}
+
+	// Always run procedural detection too: it's cheap and produces the
+	// status objects the rest of the wizard / Apply page consume.
 	claudeStatus := provider.DetectClaude()
 	codexStatus := provider.DetectCodex()
 	lmStatus := provider.DetectLMStudio(cfg.Local.URL)
@@ -88,9 +100,12 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	if ollama := provider.DetectOllama(); ollama.Installed {
 		statuses = append(statuses, ollama)
 	}
-	fmt.Println()
-	provider.PrintStatus(statuses)
-	fmt.Println()
+	if !interactive {
+		fmt.Println("  Detecting providers...")
+		fmt.Println()
+		provider.PrintStatus(statuses)
+		fmt.Println()
+	}
 
 	if !interactive {
 		output.Info("Non-interactive mode — writing defaults.")
