@@ -7,6 +7,9 @@
 # Per-project Claude Code state
 /.claude/
 
+# Local agent-helper config dropped in repo root during dev/testing
+/.agent-helper.toml
+
 # Editor
 .idea/
 .vscode/
